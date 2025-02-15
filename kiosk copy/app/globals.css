@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #fcfcfd;
+  --foreground: #171717;
+  --primary: #0e5f97;
+  --primary-foreground: #fcfcfd;
+  --secondary: #ecb662;
+  --secondary-foreground: #171717;
+  --accent: #fb510f;
+  --accent-foreground: #fcfcfd;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Touch-optimized styles */
+@media (max-width: 640px) {
+  * {
+    cursor: none !important;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
