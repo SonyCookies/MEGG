@@ -3,7 +3,7 @@ version: '3.8'
 services:
   kiosk:
     build: 
-      context: ./kiosk
+      context: ./kiosk-next
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
@@ -13,7 +13,7 @@ services:
       - ai-backend
 
   web:
-    build: ./web
+    build: ./web-next
     ports:
       - "3001:3000"
 

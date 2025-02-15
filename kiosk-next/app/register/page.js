@@ -1,4 +1,4 @@
-import QRCode from "../register/components/QRCode";
+import QRCode from "./components/QRCode";
 import { generateMachineId } from "../../lib/utils";
 
 export default function RegisterPage() {
