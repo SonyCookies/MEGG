@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  kiosk:
+    build: 
+      context: ./kiosk
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://ai-backend:8000
+    depends_on:
+      - ai-backend
+
+  web:
+    build: ./web
+    ports:
+      - "3001:3000"
+
+  ai-backend:
+    build: ./ai-backend
+    ports:
+      - "8000:8000"
+
+  iot-backend:
+    build: ./iot-backend
+    ports:
+      - "8001:8000"
