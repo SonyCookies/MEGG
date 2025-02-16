@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Camera, Play, Pause, RotateCcw, Maximize, Minimize, RefreshCw } from "lucide-react"
 
@@ -9,14 +8,11 @@ export default function DefectDetection() {
   const [isDetecting, setIsDetecting] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [batchNumber, setBatchNumber] = useState("")
+  const [batchNumber, setBatchNumber] = useState("B001")
   const [showDefects, setShowDefects] = useState(false)
-  const [socket, setSocket] = useState(null)
   const [detectionResult, setDetectionResult] = useState({ prediction: "", confidence: 0 })
   const videoRef = useRef(null)
-  const streamRef = useRef(null)
   const containerRef = useRef(null)
-  const searchParams = useSearchParams()
 
   const [eggCounts, setEggCounts] = useState({
     small: 0,
@@ -32,104 +28,33 @@ export default function DefectDetection() {
     darkSpots: 0,
   })
 
-  useEffect(() => {
-    const batch = searchParams.get("batch")
-    if (batch) {
-      setBatchNumber(batch)
-    }
-  }, [searchParams])
-
-  useEffect(() => {
-    if (isDetecting) {
-      const ws = new WebSocket("ws://localhost:8000/ws/realtime-detect")
-
-      ws.onopen = () => {
-        console.log("WebSocket connection established")
-      }
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        setDetectionResult(data)
-
-        if (data.prediction === "good") {
-          setEggCounts((prev) => ({ ...prev, [getEggSize()]: prev[getEggSize()] + 1 }))
-          setDefectCounts((prev) => ({ ...prev, good: prev.good + 1 }))
-        } else {
-          setDefectCounts((prev) => ({ ...prev, [data.prediction]: prev[data.prediction] + 1 }))
-        }
-      }
-
-      ws.onclose = () => {
-        console.log("WebSocket connection closed")
-      }
-
-      setSocket(ws)
-
-      return () => {
-        ws.close()
-        setSocket(null)
-      }
-    }
-  }, [isDetecting])
-
-  const getEggSize = () => {
-    const sizes = ["small", "medium", "large", "xl", "jumbo"]
-    return sizes[Math.floor(Math.random() * sizes.length)]
-  }
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
-        videoRef.current.play()
-        setCameraActive(true)
-      }
-    } catch (err) {
-      console.error("Error accessing the camera:", err)
-    }
-  }
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      const tracks = streamRef.current.getTracks()
-      tracks.forEach((track) => track.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-    setCameraActive(false)
-  }, [])
-
-  const startDetection = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/detect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ action: "start" }),
-      })
-      const data = await response.json()
-      console.log("Detection started:", data)
-    } catch (error) {
-      console.error("Error starting detection:", error)
-    }
-  }
-
-  const toggleDetection = async () => {
+  const toggleDetection = () => {
     if (!isDetecting) {
-      await startCamera()
-      await startDetection()
+      setCameraActive(true)
+      // Simulate detection results
+      const interval = setInterval(() => {
+        const prediction =
+          Math.random() > 0.7 ? "good" : ["dirty", "cracked", "darkSpots"][Math.floor(Math.random() * 3)]
+        const confidence = Math.random()
+        setDetectionResult({ prediction, confidence })
+        updateCounts(prediction)
+      }, 2000)
+      setIsDetecting(true)
+      return () => clearInterval(interval)
     } else {
-      stopCamera()
-      if (socket) {
-        socket.close()
-      }
+      setCameraActive(false)
+      setIsDetecting(false)
     }
-    setIsDetecting(!isDetecting)
+  }
+
+  const updateCounts = (prediction) => {
+    if (prediction === "good") {
+      const size = ["small", "medium", "large", "xl", "jumbo"][Math.floor(Math.random() * 5)]
+      setEggCounts((prev) => ({ ...prev, [size]: prev[size] + 1 }))
+      setDefectCounts((prev) => ({ ...prev, good: prev.good + 1 }))
+    } else {
+      setDefectCounts((prev) => ({ ...prev, [prediction]: prev[prediction] + 1 }))
+    }
   }
 
   const toggleFullscreen = () => {
@@ -162,12 +87,18 @@ export default function DefectDetection() {
     document.addEventListener("msfullscreenchange", handleFullscreenChange)
 
     return () => {
-      stopCamera()
       document.removeEventListener("fullscreenchange", handleFullscreenChange)
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange)
       document.removeEventListener("msfullscreenchange", handleFullscreenChange)
     }
-  }, [stopCamera])
+  }, [])
+
+  const resetCounts = () => {
+    setEggCounts({ small: 0, medium: 0, large: 0, xl: 0, jumbo: 0 })
+    setDefectCounts({ good: 0, dirty: 0, cracked: 0, darkSpots: 0 })
+    setIsDetecting(false)
+    setCameraActive(false)
+  }
 
   const totalEggs = Object.values(eggCounts).reduce((a, b) => a + b, 0)
 
@@ -184,20 +115,17 @@ export default function DefectDetection() {
 
         <div className="mb-4 text-center">
           <span className="text-lg font-semibold text-[#0e5f97]">Current Batch: </span>
-          <span className="text-lg">{batchNumber || "Not set"}</span>
+          <span className="text-lg">{batchNumber}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div ref={containerRef} className="md:col-span-2 bg-[#fcfcfd] rounded-xl shadow-md p-4 relative">
             <div className="aspect-video bg-[#0e4772] rounded-lg flex items-center justify-center overflow-hidden">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${cameraActive ? "block" : "hidden"}`}
-              />
-              {!cameraActive && <Camera className="w-12 h-12 text-[#fcfcfd] opacity-50" />}
+              {cameraActive ? (
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              ) : (
+                <Camera className="w-12 h-12 text-[#fcfcfd] opacity-50" />
+              )}
             </div>
             <div className="mt-4 flex justify-between items-center">
               <button
@@ -219,12 +147,7 @@ export default function DefectDetection() {
                 )}
               </button>
               <button
-                onClick={() => {
-                  stopCamera()
-                  setIsDetecting(false)
-                  setEggCounts({ small: 0, medium: 0, large: 0, xl: 0, jumbo: 0 })
-                  setDefectCounts({ good: 0, dirty: 0, cracked: 0, darkSpots: 0 })
-                }}
+                onClick={resetCounts}
                 className="bg-[#ecb662] text-[#171717] px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />

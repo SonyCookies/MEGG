@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Egg Defect Detection</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        img { width: 400px; border: 2px solid #000; }
+        button { padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Egg Defect Detection</h1>
+
+    <h2>Live Camera Detection</h2>
+    <img src="/detect" alt="Live Stream">
+    
+    <h2>Upload an Egg Image</h2>
+    <input type="file" id="fileInput">
+    <button onclick="uploadImage()">Upload & Predict</button>
+
+    <h3 id="result"></h3>
+
+    <script>
+        function uploadImage() {
+            let fileInput = document.getElementById("fileInput");
+            let file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select an image!");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = 
+                    `Prediction: ${data.predicted_class} (${data.confidence})`;
+            })
+            .catch(error => console.error("Error:", error));
+        }
+    </script>
+
+</body>
+</html>
