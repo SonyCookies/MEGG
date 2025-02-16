@@ -1,8 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { ArrowLeft, Camera, Play, Pause, RotateCcw, Maximize, Minimize, RefreshCw } from "lucide-react"
+
+const WS_URL = "ws://localhost:8000/ws" // Update this to your actual WebSocket URL
+const FRAME_INTERVAL = 3000 // 3 seconds in milliseconds
 
 export default function DefectDetection() {
   const [isDetecting, setIsDetecting] = useState(false)
@@ -11,8 +14,13 @@ export default function DefectDetection() {
   const [batchNumber, setBatchNumber] = useState("B001")
   const [showDefects, setShowDefects] = useState(false)
   const [detectionResult, setDetectionResult] = useState({ prediction: "", confidence: 0 })
+  const [wsStatus, setWsStatus] = useState("Disconnected")
+  const [bboxCoordinates, setBboxCoordinates] = useState(null)
   const videoRef = useRef(null)
+  const canvasRef = useRef(null)
   const containerRef = useRef(null)
+  const wsRef = useRef(null)
+  const intervalRef = useRef(null)
 
   const [eggCounts, setEggCounts] = useState({
     small: 0,
@@ -28,22 +36,138 @@ export default function DefectDetection() {
     darkSpots: 0,
   })
 
+  const connectWebSocket = useCallback(() => {
+    wsRef.current = new WebSocket(WS_URL)
+
+    wsRef.current.onerror = (error) => {
+      console.error("WebSocket error:", error)
+      console.error("Error details:", {
+        type: error.type,
+        message: error.message,
+        filename: error.filename,
+        lineno: error.lineno,
+        colno: error.colno,
+        error: error.error,
+      })
+      setWsStatus("Error: " + (error.message || "Unknown error"))
+    }
+
+    wsRef.current.onopen = () => {
+      console.log("WebSocket connected")
+      setWsStatus("Connected")
+    }
+
+    wsRef.current.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      setDetectionResult({ prediction: data.defect, confidence: data.confidence })
+      setBboxCoordinates(data.bbox)
+      updateCounts(data.defect)
+    }
+
+    wsRef.current.onclose = (event) => {
+      console.log("WebSocket disconnected:", event.reason)
+      setWsStatus("Disconnected")
+      setTimeout(connectWebSocket, 5000) // Try to reconnect after 5 seconds
+    }
+  }, [])
+
+  const captureAndSendFrame = useCallback(() => {
+    if (videoRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const canvas = document.createElement("canvas")
+      canvas.width = videoRef.current.videoWidth
+      canvas.height = videoRef.current.videoHeight
+      canvas.getContext("2d").drawImage(videoRef.current, 0, 0)
+      const imageData = canvas.toDataURL("image/jpeg")
+      wsRef.current.send(imageData)
+      console.log("Frame sent to WebSocket server")
+    }
+  }, [])
+
+  const drawBoundingBox = useCallback(() => {
+    if (canvasRef.current && videoRef.current && bboxCoordinates) {
+      const ctx = canvasRef.current.getContext("2d")
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+
+      // Draw bounding box
+      ctx.strokeStyle = "green"
+      ctx.lineWidth = 2
+      const [x, y, width, height] = bboxCoordinates
+      ctx.strokeRect(x, y, width, height)
+
+      // Draw label and confidence
+      ctx.fillStyle = "rgba(0, 255, 0, 0.7)"
+      ctx.fillRect(x, y - 20, 150, 20)
+      ctx.font = "16px Arial"
+      ctx.fillStyle = "black"
+      ctx.fillText(`${detectionResult.prediction} ${detectionResult.confidence.toFixed(2)}%`, x + 5, y - 5)
+    }
+  }, [bboxCoordinates, detectionResult])
+
+  useEffect(() => {
+    if (isDetecting) {
+      connectWebSocket()
+      intervalRef.current = setInterval(captureAndSendFrame, FRAME_INTERVAL)
+    } else {
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isDetecting, connectWebSocket, captureAndSendFrame])
+
+  useEffect(() => {
+    drawBoundingBox()
+  }, [drawBoundingBox])
+
   const toggleDetection = () => {
     if (!isDetecting) {
       setCameraActive(true)
-      // Simulate detection results
-      const interval = setInterval(() => {
-        const prediction =
-          Math.random() > 0.7 ? "good" : ["dirty", "cracked", "darkSpots"][Math.floor(Math.random() * 3)]
-        const confidence = Math.random()
-        setDetectionResult({ prediction, confidence })
-        updateCounts(prediction)
-      }, 2000)
       setIsDetecting(true)
-      return () => clearInterval(interval)
+      startVideoStream()
     } else {
       setCameraActive(false)
       setIsDetecting(false)
+      stopVideoStream()
+    }
+  }
+
+  const startVideoStream = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.onloadedmetadata = () => {
+          if (canvasRef.current) {
+            canvasRef.current.width = videoRef.current.videoWidth
+            canvasRef.current.height = videoRef.current.videoHeight
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error accessing the camera:", err)
+      setWsStatus("Camera Error: " + err.message)
+    }
+  }
+
+  const stopVideoStream = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks()
+      tracks.forEach((track) => track.stop())
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d")
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
     }
   }
 
@@ -98,6 +222,7 @@ export default function DefectDetection() {
     setDefectCounts({ good: 0, dirty: 0, cracked: 0, darkSpots: 0 })
     setIsDetecting(false)
     setCameraActive(false)
+    stopVideoStream()
   }
 
   const totalEggs = Object.values(eggCounts).reduce((a, b) => a + b, 0)
@@ -120,9 +245,12 @@ export default function DefectDetection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div ref={containerRef} className="md:col-span-2 bg-[#fcfcfd] rounded-xl shadow-md p-4 relative">
-            <div className="aspect-video bg-[#0e4772] rounded-lg flex items-center justify-center overflow-hidden">
+            <div className="aspect-video bg-[#0e4772] rounded-lg flex items-center justify-center overflow-hidden relative">
               {cameraActive ? (
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <>
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
+                </>
               ) : (
                 <Camera className="w-12 h-12 text-[#fcfcfd] opacity-50" />
               )}
@@ -214,13 +342,14 @@ export default function DefectDetection() {
 
         <div className="mt-6 bg-[#fcfcfd] rounded-lg p-4 shadow-md">
           <div className="text-sm text-center text-[#171717]/60">
-            System Status:{" "}
-            <span className="text-[#0e5f97] font-medium">{isDetecting ? "Online - Detecting" : "Online - Idle"}</span>
+            System Status: <span className="text-[#0e5f97] font-medium">{wsStatus}</span>
           </div>
-          {isDetecting && (
+          {isDetecting && detectionResult.prediction && (
             <div className="text-sm text-center text-[#171717]/60 mt-2">
-              Last Detection: {detectionResult.prediction} (Confidence: {(detectionResult.confidence * 100).toFixed(2)}
-              %)
+              Last Detection: {detectionResult.prediction}
+              {detectionResult.confidence !== undefined && (
+                <span> (Confidence: {detectionResult.confidence.toFixed(2)}%)</span>
+              )}
             </div>
           )}
         </div>

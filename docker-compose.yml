@@ -1,18 +1,18 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  kiosk:
+  kiosk-next:
     build: 
       context: ./kiosk-next
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://ai-backend:8000
+      - NEXT_PUBLIC_API_URL=http://ai-backend:8000 
     depends_on:
       - ai-backend
 
-  web:
+  web-next:
     build: ./web-next
     ports:
       - "3001:3000"
@@ -21,8 +21,12 @@ services:
     build: ./ai-backend
     ports:
       - "8000:8000"
+    volumes:
+      - ./ai-backend/app:/app 
+    environment:
+      - MODEL_PATH=/app/model/egg_resnet50.keras 
 
   iot-backend:
     build: ./iot-backend
     ports:
-      - "8001:8000"
+      - "8001:8001" 

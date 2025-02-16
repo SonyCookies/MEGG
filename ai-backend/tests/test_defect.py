@@ -4,7 +4,7 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 MODEL_PATH = "D:/4TH YEAR/CAPSTONE/MEGG/ai-backend/model/egg_resnet50.keras"
 
-IMAGE_PATH = "D:/4TH YEAR/CAPSTONE/MEGG/ai-backend/testing_images/c3226b06-ca33-456e-aa7d-2dd3d15e4983.jpg"
+IMAGE_PATH = "D:/4TH YEAR/CAPSTONE/MEGG/ai-backend/testing_images/dirty2.jpg"
 
 IMG_WIDTH, IMG_HEIGHT = 224, 224
 
