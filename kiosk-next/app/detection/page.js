@@ -7,8 +7,8 @@ import { saveDefectLog, initializeBatch, syncOfflineData, checkInternetConnectio
 import { db } from "../firebase"
 import { doc, onSnapshot } from "firebase/firestore"
 
-const WS_URL = "ws://localhost:8000/ws" // Update this to your actual WebSocket URL
-const FRAME_INTERVAL = 3000 // 3 seconds in milliseconds
+const WS_URL = "ws://localhost:8000/ws"
+const FRAME_INTERVAL = 3000 //
 const PING_INTERVAL = 30000 // 30 seconds
 
 export default function DefectDetection() {
@@ -65,16 +65,20 @@ export default function DefectDetection() {
         console.log("Received pong from server")
         return
       }
-      setDetectionResult({ prediction: data.defect, confidence: data.confidence })
-      setBboxCoordinates(data.bbox)
-      updateCounts(data.defect)
+      if (isDetecting) {
+        setDetectionResult({ prediction: data.defect, confidence: data.confidence })
+        setBboxCoordinates(data.bbox)
+        updateCounts(data.defect)
+      } else {
+        console.log("Received message while not detecting, ignoring:", data)
+      }
     }
 
     wsRef.current.onclose = (event) => {
       console.log("WebSocket disconnected:", event.reason)
       setWsStatus("Disconnected")
       stopPing()
-      setTimeout(connectWebSocket, 5000) 
+      setTimeout(connectWebSocket, 5000)
     }
   }, [])
 
@@ -98,27 +102,35 @@ export default function DefectDetection() {
   }, [])
 
   useEffect(() => {
-    if (isDetecting) {
-      connectWebSocket()
-    } else {
+    if (wsRef.current) {
+      console.log("Cleaning up WebSocket connection")
+      wsRef.current.close()
+    }
+    stopPing()
+  }, [wsRef, stopPing])
+
+  useEffect(() => {
+    const connectWithDelay = () => {
+      console.log("Preparing to connect WebSocket...")
+      setTimeout(() => {
+        console.log("Connecting WebSocket after delay...")
+        connectWebSocket()
+      }, 1000) // 1 second delay
+    }
+
+    connectWithDelay()
+
+    return () => {
       if (wsRef.current) {
         console.log("Closing WebSocket connection")
         wsRef.current.close()
       }
       stopPing()
     }
-
-    return () => {
-      if (wsRef.current) {
-        console.log("Cleaning up WebSocket connection")
-        wsRef.current.close()
-      }
-      stopPing()
-    }
-  }, [isDetecting, connectWebSocket, stopPing])
+  }, [connectWebSocket, stopPing])
 
   const captureAndSendFrame = useCallback(async () => {
-    if (videoRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (videoRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && isDetecting) {
       try {
         // 1. Capture frame
         const canvas = document.createElement("canvas")
@@ -145,36 +157,25 @@ export default function DefectDetection() {
         setUploadStatus(`Error: ${error.message || "Failed to save data"}`)
       }
     } else {
-      console.log("Cannot send frame: Video or WebSocket not ready")
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        console.log("WebSocket is not open. Attempting to reconnect...")
-        connectWebSocket()
-      }
+      console.log("Cannot send frame: Video or WebSocket not ready, or detection not active")
     }
-  }, [detectionResult, batchNumber, isOnline, connectWebSocket])
+  }, [videoRef, wsRef, isDetecting, detectionResult, batchNumber, isOnline])
 
   useEffect(() => {
     if (isDetecting) {
-      connectWebSocket()
       intervalRef.current = setInterval(captureAndSendFrame, FRAME_INTERVAL)
     } else {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
     }
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isDetecting, connectWebSocket, captureAndSendFrame])
+  }, [isDetecting, captureAndSendFrame])
 
   const drawBoundingBox = useCallback(() => {
     if (canvasRef.current && videoRef.current && bboxCoordinates) {
@@ -194,7 +195,7 @@ export default function DefectDetection() {
       ctx.fillStyle = "black"
       ctx.fillText(`${detectionResult.prediction} ${detectionResult.confidence.toFixed(2)}%`, x + 5, y - 5)
     }
-  }, [bboxCoordinates, detectionResult])
+  }, [bboxCoordinates, detectionResult, canvasRef, videoRef])
 
   useEffect(() => {
     drawBoundingBox()
@@ -205,10 +206,14 @@ export default function DefectDetection() {
       setCameraActive(true)
       setIsDetecting(true)
       startVideoStream()
+      intervalRef.current = setInterval(captureAndSendFrame, FRAME_INTERVAL)
     } else {
       setCameraActive(false)
       setIsDetecting(false)
       stopVideoStream()
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
     }
   }
 
@@ -321,7 +326,6 @@ export default function DefectDetection() {
       window.addEventListener("online", handleOnline)
       window.addEventListener("offline", handleOffline)
 
-      // Check initial connection status and sync if online
       if (checkInternetConnection()) {
         setIsOnline(true)
         syncOfflineData()
@@ -354,7 +358,7 @@ export default function DefectDetection() {
             console.error("Periodic sync: Error syncing offline data:", error)
           })
       }
-    }, 60000) // Check every minute
+    }, 60000)
 
     return () => clearInterval(syncInterval)
   }, [isOnline])
@@ -362,7 +366,6 @@ export default function DefectDetection() {
   useEffect(() => {
     const latestDetectionRef = doc(db, "latestDetection", "current")
 
-    // Listen for changes to the latest detection
     const unsubscribe = onSnapshot(latestDetectionRef, (doc) => {
       if (doc.exists()) {
         setDetectionResult(doc.data())

@@ -31,21 +31,37 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.debug("WebSocket connection attempt")
     await websocket.accept()
     logger.debug("WebSocket connection accepted")
-    
+
+    model = websocket.app.state.model
+    if model is None:
+        logger.error("Model not loaded in app state.")
+        await websocket.send_json({"error": "Model not available"})
+        await websocket.close()
+        return
+
     try:
         while True:
             try:
                 data = await websocket.receive_text()
-                logger.debug(f"Received data of length: {len(data)}")
+                logger.debug(f"Received data length: {len(data)}")
+
+                # Ensure correct base64 format
+                if "," not in data:
+                    logger.error("Invalid Base64 format received.")
+                    await websocket.send_json({"error": "Invalid image format"})
+                    continue
                 
-                # Decode base64 image
                 img_data = base64.b64decode(data.split(',')[1])
                 nparr = np.frombuffer(img_data, np.uint8)
                 image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 
-                logger.debug(f"Decoded image shape: {image.shape}")
+                if image is None:
+                    logger.error("Failed to decode image")
+                    await websocket.send_json({"error": "Failed to decode image"})
+                    continue
                 
-                # Preprocess image
+                logger.debug(f"Decoded image shape: {image.shape}")
+
                 try:
                     preprocessed_image = preprocess_frame(image)
                     logger.debug(f"Preprocessed image shape: {preprocessed_image.shape}")
@@ -53,30 +69,36 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.error(f"Error during preprocessing: {str(e)}")
                     logger.error(traceback.format_exc())
                     await websocket.send_json({"error": "Image preprocessing failed"})
-                    continue  # Skip this frame and continue with the next one
-                
-                # Predict
-                prediction = websocket.app.state.model.predict(preprocessed_image)
-                logger.debug(f"Raw prediction: {prediction}")
-                
+                    continue 
+
+                # Ensure the model is predicting correctly
+                try:
+                    prediction = model.predict(preprocessed_image)
+                    logger.debug(f"Raw prediction output: {prediction}")
+                except Exception as e:
+                    logger.error(f"Model prediction error: {str(e)}")
+                    await websocket.send_json({"error": "Model prediction failed"})
+                    continue
+
                 class_index = np.argmax(prediction[0])
                 confidence = float(prediction[0][class_index]) * 100
                 predicted_class = settings.CLASS_LABELS[class_index]
-                
-                # Calculate bounding box (assuming egg is centered)
+
+                # Define bounding box dynamically (Optional logic)
                 height, width = image.shape[:2]
                 box_width = int(width * 0.5)
                 box_height = int(height * 0.5)
                 x = int(width * 0.25)
                 y = int(height * 0.25)
                 bbox = [x, y, box_width, box_height]
-                
+
                 logger.debug(f"Sending prediction: {predicted_class}, confidence: {confidence}, bbox: {bbox}")
                 await websocket.send_json({
                     "defect": predicted_class,
                     "confidence": confidence,
                     "bbox": bbox
                 })
+                
             except WebSocketDisconnect:
                 logger.info("WebSocket disconnected")
                 break
@@ -85,8 +107,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(traceback.format_exc())
                 await websocket.send_json({"error": str(e)})
     except Exception as e:
-        logger.error(f"Unexpected error in WebSocket connection: {str(e)}")
+        logger.error(f"Unexpected WebSocket error: {str(e)}")
         logger.error(traceback.format_exc())
     finally:
         logger.debug("WebSocket connection closed")
-
