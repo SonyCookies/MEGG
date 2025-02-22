@@ -1,67 +1,110 @@
+"use client"
+
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
-import { ArrowLeft, Search } from "lucide-react"
+import { ArrowLeft, Calendar, ImageIcon, PieChart, List, Package } from "lucide-react"
+import { db } from "../firebaseConfig"
+import { collection, query, orderBy, limit, startAfter, getDocs, onSnapshot } from "firebase/firestore"
+import { useInternetConnection } from "../contexts/InternetConnectionContext"
+import { useWebSocket } from "../contexts/WebSocketContext"
+import { ConnectionStatus } from "../components/ConnectionStatus"
+import LogsTab from "./components/LogsTab"
+import ImagesTab from "./components/ImagesTab"
+import StatisticsTab from "./components/StatisticsTab"
+import DailySummaryTab from "./components/DailySummaryTab"
+import BatchReviewTab from "./components/BatchReviewTab"
 
 export default function DefectHistory() {
-  const defectHistoryData = [
-    { id: 1, date: "2023-06-20", batchNumber: "B001", defectType: "Crack", quantity: 5 },
-    { id: 2, date: "2023-06-19", batchNumber: "B002", defectType: "Dirt", quantity: 3 },
-    { id: 3, date: "2023-06-18", batchNumber: "B003", defectType: "Deformity", quantity: 2 },
-    { id: 4, date: "2023-06-17", batchNumber: "B004", defectType: "Crack", quantity: 4 },
-    { id: 5, date: "2023-06-16", batchNumber: "B005", defectType: "Dirt", quantity: 1 },
+  const isOnline = useInternetConnection()
+  const { readyState } = useWebSocket()
+  const [activeTab, setActiveTab] = useState("log")
+  const [error, setError] = useState(null)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+
+  // Initial data load
+  useEffect(() => {
+    if (initialLoadComplete) return
+
+    // Load defect logs
+    const unsubscribeLogs = onSnapshot(
+      query(collection(db, "defect_logs"), orderBy("timestamp", "desc")),
+      (snapshot) => {
+        const logs = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        setInitialLoadComplete(true)
+      },
+      (error) => {
+        console.error("Error in real-time updates:", error)
+        setError(error.message)
+      },
+    )
+
+    return () => {
+      unsubscribeLogs()
+    }
+  }, [initialLoadComplete])
+
+  const tabs = [
+    { id: "log", label: "Defect Log", icon: List },
+    { id: "images", label: "Images", icon: ImageIcon },
+    { id: "statistics", label: "Statistics", icon: PieChart },
+    { id: "daily", label: "Daily Summary", icon: Calendar },
+    { id: "batch", label: "Batch Review", icon: Package },
   ]
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#fcfcfd] p-4 flex items-center justify-center">
+        <div className="text-red-500">Error loading data: {error}</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
+      <div className="max-w-3xl mx-auto">
         <header className="flex items-center justify-between mb-6">
           <Link href="/home" className="text-[#0e5f97] hover:text-[#0e4772] transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </Link>
           <h1 className="text-2xl font-bold text-[#0e5f97]">Defect History</h1>
-          <div className="w-6 h-6" /> {/* Placeholder for symmetry */}
+          <div className="w-6 h-6" />
         </header>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by batch number or defect type"
-              className="w-full p-2 pl-10 pr-4 border border-[#0e5f97] rounded-md"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#0e5f97]" />
-          </div>
-        </div>
+        <ConnectionStatus isOnline={isOnline} readyState={readyState} />
 
-        {/* Defect History Table */}
-        <div className="bg-[#fcfcfd] rounded-xl shadow-md overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-[#0e5f97] text-[#fcfcfd]">
-              <tr>
-                <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-left">Batch Number</th>
-                <th className="p-2 text-left">Defect Type</th>
-                <th className="p-2 text-left">Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {defectHistoryData.map((item) => (
-                <tr key={item.id} className="border-b border-[#ecb662]">
-                  <td className="p-2">{item.date}</td>
-                  <td className="p-2">{item.batchNumber}</td>
-                  <td className="p-2">{item.defectType}</td>
-                  <td className="p-2">{item.quantity}</td>
-                </tr>
+        <div className="mt-6">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2" role="tablist">
+              {tabs.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={activeTab === id}
+                  aria-controls={`${id}-tab`}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
+                    ${activeTab === id ? "bg-[#0e5f97] text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
 
-        {/* System Status */}
-        <div className="mt-6 bg-[#fcfcfd] rounded-lg p-4 shadow-md">
-          <div className="text-sm text-center text-[#171717]/60">
-            System Status: <span className="text-[#0e5f97] font-medium">Online - Viewing History</span>
+            <div className="bg-white rounded-xl shadow-md p-6">
+              {activeTab === "log" && <LogsTab />}
+
+              {activeTab === "images" && <ImagesTab />}
+
+              {activeTab === "statistics" && <StatisticsTab />}
+
+              {activeTab === "daily" && <DailySummaryTab />}
+
+              {activeTab === "batch" && <BatchReviewTab />}
+            </div>
           </div>
         </div>
       </div>

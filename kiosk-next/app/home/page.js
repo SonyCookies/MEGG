@@ -1,12 +1,18 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\home\page.js
+
 "use client"
 
 import { useState } from "react"
 import Link from "next/link"
-import { Camera, Settings, History, SortAsc, UserCog, Package, Play } from 'lucide-react'
+import { Camera, Settings, History, SortAsc, UserCog, Package, Play, Wifi, WifiOff } from "lucide-react"
 import BatchModal from "./components/BatchModel"
+import { useWebSocket } from "../contexts/WebSocketContext"
+import { useInternetConnection } from "../contexts/InternetConnectionContext"
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const { readyState } = useWebSocket()
+  const isOnline = useInternetConnection()
 
   const navigationItems = [
     {
@@ -77,8 +83,24 @@ export default function Home() {
 
         {/* System Status */}
         <div className="mt-6 bg-[#fcfcfd] rounded-lg p-4 shadow-md">
-          <div className="text-sm text-center text-[#171717]/60">
-            System Status: <span className="text-[#0e5f97] font-medium">Online</span>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              {isOnline ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
+              <span className="text-sm text-[#171717]/60">
+                System Status:{" "}
+                <span className={`font-medium ${isOnline ? "text-green-500" : "text-red-500"}`}>
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-[#171717]/60">
+                WebSocket:{" "}
+                <span className={`font-medium ${readyState === WebSocket.OPEN ? "text-green-500" : "text-red-500"}`}>
+                  {readyState === WebSocket.OPEN ? "Connected" : "Disconnected"}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -96,3 +118,4 @@ export default function Home() {
     </div>
   )
 }
+

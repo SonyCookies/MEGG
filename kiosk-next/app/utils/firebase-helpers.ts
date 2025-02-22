@@ -1,4 +1,6 @@
-import { storage, db } from "../firebase"
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\utils\firebase-helpers.ts
+
+import { storage, db } from "../firebaseConfig"
 import { ref, uploadBytes } from "firebase/storage"
 import { collection, addDoc, doc, serverTimestamp, increment, setDoc, updateDoc } from "firebase/firestore"
 import { addImage, addDetectionData, getUnsynced, markAsSynced, clearDatabase } from "./indexedDB"

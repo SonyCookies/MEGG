@@ -1,39 +1,22 @@
+# D:\4TH YEAR\CAPSTONE\MEGG\ai-backend\app\main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
-from app.model_loader import load_model
-from app.websocket_server import router as websocket_router
+from .websocket_server import websocket_endpoint
 
 app = FastAPI()
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
-@app.on_event("startup")
-async def startup_event():
-    app.state.model = load_model()
-    if app.state.model is None:
-        raise Exception("Failed to load the model")
-
-app.include_router(websocket_router)
-
-@app.get("/")
-async def root():
-    return {"message": "Egg Defect Detection API is running"}
+app.add_api_websocket_route("/ws", websocket_endpoint)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        app,
-        host=settings.HOST,
-        port=settings.PORT,
-        ssl_keyfile=None,  # Add this line
-        ssl_certfile=None,  # Add this line
-    )
-
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

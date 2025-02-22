@@ -1,14 +1,13 @@
-from pydantic_settings import BaseSettings
+# D:\4TH YEAR\CAPSTONE\MEGG\ai-backend\app\config.py
 
-class Settings(BaseSettings):
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
-    MODEL_PATH: str = "model/egg_resnet50.keras"
-    CLASS_LABELS: list = ["cracked", "dirty", "good"]
-    IMG_WIDTH: int = 224
-    IMG_HEIGHT: int = 224
-    
-    class Config:
-        env_file = ".env"
+from app.actions import handle_ping, handle_defect_detection
 
-settings = Settings()
+# Define the mapping of action types to their handler functions
+ACTIONS = {
+    "ping": handle_ping,
+    "defect_detection": handle_defect_detection,
+    # Add more actions and their corresponding handlers here
+}
+
+# You can add more configuration variables here as needed
+WEBSOCKET_PATH = "/ws"
