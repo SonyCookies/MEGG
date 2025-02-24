@@ -8,10 +8,10 @@ export function Sidebar({ mobileSidebarOpen, toggleMobileSidebar }) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/overview", icon: LayoutDashboard, label: "Overview" },
-    { href: "/inventory", icon: Package, label: "Inventory" },
-    { href: "/machines", icon: Monitor, label: "Machines" },
-    { href: "/settings", icon: Settings, label: "Settings" },
+    { href: "/admin/overview", icon: LayoutDashboard, label: "Overview" },
+    { href: "/admin/inventory", icon: Package, label: "Inventory" },
+    { href: "/admin/machines", icon: Monitor, label: "Machines" },
+    { href: "/admin/settings", icon: Settings, label: "Settings" },
   ];
 
   const isActive = (href) => pathname === href;

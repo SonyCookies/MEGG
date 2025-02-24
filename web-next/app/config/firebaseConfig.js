@@ -10,11 +10,16 @@ const firebaseConfig = {
   storageBucket: "egg-cellent-4ca51.firebasestorage.app",
   messagingSenderId: "457648596846",
   appId: "1:457648596846:web:e351d64c2eaf0081a8037f",
-  measurementId: "G-J7MDCPJ8Q8",
+  measurementId: "G-J7MDCPJ8Q8"
 }
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
+
+// Initialize Auth with app config
 export const auth = getAuth(app)
+auth.settings.appVerificationDisabledForTesting = false // Ensure this is false for production
+
+// export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
