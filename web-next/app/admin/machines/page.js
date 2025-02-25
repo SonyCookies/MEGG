@@ -47,7 +47,7 @@ export default function MachinesPage() {
   const offlineMachines = totalMachines - activeMachines;
 
   return (
-    <div className="min-h-screen flex flex-col gap-6 bg-new-white p-4 lg:p-6">
+    <div className="min-h-screen flex flex-col gap-6 bg-gray-300/10 p-4 lg:p-6">
       <Navbar
         sidebarOpen={sidebarOpen}
         mobileSidebarOpen={mobileSidebarOpen}
@@ -67,7 +67,7 @@ export default function MachinesPage() {
             <div className="w-full flex gap-6">
               <div className="flex flex-1 flex-col gap-6">
                 <div className="grid grid-cols-6 gap-4 items-center">
-                  <div className="col-span-6 md:col-span-2 bg-blue-500 p-6 rounded-2xl shadow-md">
+                  <div className="col-span-6 md:col-span-2 bg-blue-500 p-6 rounded-2xl shadow">
                     <h1 className="text-xl text-white flex items-center gap-2">
                       <Monitor className="w-5 h-5" /> Total:
                     </h1>
@@ -75,7 +75,7 @@ export default function MachinesPage() {
                       {totalMachines}
                     </h1>
                   </div>
-                  <div className="col-span-3 md:col-span-2 bg-new-yellow p-6 rounded-2xl shadow-md">
+                  <div className="col-span-3 md:col-span-2 bg-new-yellow p-6 rounded-2xl shadow">
                     <h1 className="text-xl text-white flex items-center gap-2">
                       <Activity className="w-5 h-5" /> Active:
                     </h1>
@@ -83,7 +83,7 @@ export default function MachinesPage() {
                       {activeMachines}
                     </h1>
                   </div>
-                  <div className="col-span-3 md:col-span-2 bg-new-red p-6 rounded-2xl shadow-md">
+                  <div className="col-span-3 md:col-span-2 bg-new-red p-6 rounded-2xl shadow">
                     <h1 className="text-xl text-white flex items-center gap-2">
                       <ShieldX className="w-5 h-5" /> Offline:
                     </h1>
@@ -93,7 +93,7 @@ export default function MachinesPage() {
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-md flex flex-col gap-4">
+                <div className="bg-white border p-6 rounded-2xl shadow flex flex-col gap-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xl font-medium">List of Machines</h3>
 
@@ -107,7 +107,7 @@ export default function MachinesPage() {
                     {machines.map((machine) => (
                       <div
                         key={machine.id}
-                        className="col-span-4 md:col-span-2 bg-gray-300/20 rounded-lg shadow p-4 flex items-center hover:bg-gray-300/40 transition relative"
+                        className="col-span-4 md:col-span-2 border rounded-lg p-4 flex items-center hover:bg-gray-300/20 transition relative"
                       >
                         <div
                           className={`absolute top-2 right-4 text-sm flex items-center gap-1 ${

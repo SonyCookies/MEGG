@@ -48,7 +48,7 @@ export default function Notifications() {
 
   return (
     <div className="w-80 xl:w-96 hidden lg:block">
-      <div className="flex flex-col bg-white shadow-md rounded-2xl overflow-hidden divide-y">
+      <div className="flex flex-col bg-white shadow border rounded-2xl overflow-hidden divide-y">
         {/* Header */}
         <div className="flex items-center justify-between p-6">
           <h1 className="text-lg font-medium">Notifications</h1>

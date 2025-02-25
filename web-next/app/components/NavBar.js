@@ -92,10 +92,10 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
   }
 
   return (
-    <nav className="sticky top-4 z-50 bg-red500">
+    <nav className="sticky top-4 z-40 bg-red500">
       <div className="relative container mx-auto">
         {/* navbar container */}
-        <div className="bg-white p-4 rounded-2xl shadow flex items-center justify-between">
+        <div className="bg-white border p-4 rounded-2xl shadow flex items-center justify-between">
           {/* left */}
           <div className="flex items-center gap-2 w-full">
             {/* sidebar button for mobile */}
@@ -141,7 +141,7 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
             className="absolute bg-white rounded-2xl shadow right-0 top-full mt-4 w-56 overflow-hidden"
           >
             <div className="flex flex-col divide-y">
-              <Link href="/admin/settings" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20">
+              <Link href="/admin/profile" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20">
                 <User className="w-5 h-5" />
                 My profile
               </Link>
