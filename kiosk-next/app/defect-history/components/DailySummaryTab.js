@@ -55,28 +55,12 @@ const getDefectColor = (defectType) => {
 
 // Format date for display
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
+  return new Date(date).toLocaleString("en-US", {
+    hour: "numeric",
+    minute: "numeric",
+    hour12: true,
   })
 }
-
-// Time Period Selector
-const TimePeriodSelector = ({ period, onChange }) => (
-  <div className="flex gap-2">
-    {["7d", "14d", "30d", "90d"].map((p) => (
-      <button
-        key={p}
-        onClick={() => onChange(p)}
-        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors
-          ${period === p ? "bg-[#0e5f97] text-white" : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"}`}
-      >
-        {p}
-      </button>
-    ))}
-  </div>
-)
 
 // Enhanced Stat Card Component
 const StatCard = ({ icon: Icon, label, value, trend, color, description }) => (
@@ -119,6 +103,8 @@ const CustomTooltip = ({ active, payload, label }) => {
     year: "numeric",
     month: "long",
     day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
   })
 
   const totalDefects = payload.reduce((sum, entry) => sum + (entry.value || 0), 0)
@@ -155,7 +141,6 @@ export default function DailySummaryTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [defectLogs, setDefectLogs] = useState([])
-  const [timePeriod, setTimePeriod] = useState("7d")
   const [chartType, setChartType] = useState("area")
 
   // Fetch defect logs
@@ -166,8 +151,18 @@ export default function DailySummaryTab() {
 
       const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
       const snapshot = await getDocs(q)
-      const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      const logs = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        console.log("Raw log data:", {
+          id: doc.id,
+          timestamp: data.timestamp,
+          defect_type: data.defect_type,
+          batch_number: data.batch_number,
+        })
+        return { id: doc.id, ...data }
+      })
 
+      console.log("Total logs fetched:", logs.length)
       setDefectLogs(logs)
 
       // Log successful fetch
@@ -198,35 +193,56 @@ export default function DailySummaryTab() {
 
   // Process data for visualization
   const { dailyStats, chartData, trends, periodStats } = useMemo(() => {
-    if (!defectLogs.length) return { dailyStats: {}, chartData: [], trends: {}, periodStats: {} }
+    if (!defectLogs.length) {
+      console.log("No defect logs available")
+      return { dailyStats: {}, chartData: [], trends: {}, periodStats: {} }
+    }
 
-    // Get date range based on time period
+    // Get today's date and start of today
     const now = new Date()
-    const periodDays = Number.parseInt(timePeriod)
-    const startDate = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000)
+    console.log("Current time:", now.toISOString())
 
-    // Filter logs for selected period
-    const periodLogs = defectLogs.filter((log) => new Date(log.timestamp) >= startDate)
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    console.log("One day ago:", oneDayAgo.toISOString())
 
-    // Group by date and defect type
+    // Filter logs for the last 24 hours
+    const periodLogs = defectLogs.filter((log) => {
+      const logDate = new Date(log.timestamp)
+      const isIncluded = logDate >= oneDayAgo
+      console.log("Log filtering:", {
+        timestamp: log.timestamp,
+        parsed_date: logDate.toISOString(),
+        included: isIncluded,
+      })
+      return isIncluded
+    })
+
+    console.log("Filtered logs for last 24h:", periodLogs.length)
+
+    // Group by hour and defect type
     const dailyStats = periodLogs.reduce((acc, log) => {
-      const date = new Date(log.timestamp).toISOString().split("T")[0]
+      const logDate = new Date(log.timestamp)
+      const timeKey = new Date(logDate.setMinutes(0, 0, 0)).toISOString()
       const type = log.defect_type || "unknown"
 
-      if (!acc[date]) {
-        acc[date] = {}
+      if (!acc[timeKey]) {
+        acc[timeKey] = {}
       }
-      acc[date][type] = (acc[date][type] || 0) + 1
+      acc[timeKey][type] = (acc[timeKey][type] || 0) + 1
       return acc
     }, {})
 
-    // Prepare data for chart
+    console.log("Daily stats by hour:", dailyStats)
+
+    // Prepare chart data
     const chartData = Object.entries(dailyStats)
       .map(([date, stats]) => ({
         date,
         ...stats,
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
+
+    console.log("Prepared chart data:", chartData)
 
     // Calculate period statistics
     const periodStats = {
@@ -238,22 +254,39 @@ export default function DailySummaryTab() {
       }, {}),
     }
 
-    // Calculate trends
-    const today = new Date().toISOString().split("T")[0]
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+    console.log("Period stats:", periodStats)
 
-    const todayTotal = Object.values(dailyStats[today] || {}).reduce((sum, count) => sum + count, 0)
-    const yesterdayTotal = Object.values(dailyStats[yesterday] || {}).reduce((sum, count) => sum + count, 0)
+    // Calculate trends
+    const halfDayAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000)
+    const previousHalfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    const recentLogs = periodLogs.filter((log) => new Date(log.timestamp) >= halfDayAgo)
+    const previousLogs = periodLogs.filter((log) => {
+      const logDate = new Date(log.timestamp)
+      return logDate >= previousHalfDay && logDate < halfDayAgo
+    })
+
+    const recentTotal = recentLogs.length
+    const previousTotal = previousLogs.length
+
+    console.log("Trend calculation:", {
+      recent_12h: recentTotal,
+      previous_12h: previousTotal,
+      recent_logs: recentLogs.map((l) => l.timestamp),
+      previous_logs: previousLogs.map((l) => l.timestamp),
+    })
 
     const trends = {
-      change: todayTotal - yesterdayTotal,
-      percentage: yesterdayTotal ? ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100 : 0,
-      direction: todayTotal >= yesterdayTotal ? "up" : "down",
-      value: `${Math.abs(((todayTotal - yesterdayTotal) / yesterdayTotal) * 100).toFixed(1)}% from yesterday`,
+      change: recentTotal - previousTotal,
+      percentage: previousTotal ? ((recentTotal - previousTotal) / previousTotal) * 100 : 0,
+      direction: recentTotal >= previousTotal ? "up" : "down",
+      value: `${Math.abs(((recentTotal - previousTotal) / previousTotal) * 100).toFixed(1)}% from previous 12h`,
     }
 
+    console.log("Calculated trends:", trends)
+
     return { dailyStats, chartData, trends, periodStats }
-  }, [defectLogs, timePeriod])
+  }, [defectLogs])
 
   if (error) {
     return (
@@ -305,7 +338,6 @@ export default function DailySummaryTab() {
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
-        <TimePeriodSelector period={timePeriod} onChange={setTimePeriod} />
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Filter className="w-4 h-4" />
@@ -344,12 +376,12 @@ export default function DailySummaryTab() {
           value={periodStats.total}
           trend={trends}
           color="#0e5f97"
-          description={`Last ${timePeriod} defects`}
+          description="Today's defects"
         />
         <StatCard
           icon={Calendar}
           label="Daily Average"
-          value={(periodStats.total / Number.parseInt(timePeriod)).toFixed(1)}
+          value={(periodStats.total / 1).toFixed(1)}
           color="#ecb662"
           description="Defects per day"
         />
