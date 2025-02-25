@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Ellipsis, Check, Trash } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function Notifications() {
   const notifications = [
@@ -46,6 +47,12 @@ export default function Notifications() {
   const [activeAction, setActiveAction] = useState(null);
   const [showAll, setShowAll] = useState(false);
 
+  const router = useRouter()
+
+  const handleNotification = () => {
+    router.push('/admin/notifications')
+  }
+
   return (
     <div className="w-80 xl:w-96 hidden lg:block">
       <div className="flex flex-col bg-white shadow border rounded-2xl overflow-hidden divide-y">
@@ -68,7 +75,7 @@ export default function Notifications() {
               return (
                 <div key={notification.id} className="relative">
                   <div
-                    role="button"
+                    role="button" onClick={handleNotification}
                     className="bg-white transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full"
                   >
                     <div className="flex items-center gap-4">
