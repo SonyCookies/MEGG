@@ -12,9 +12,9 @@ export function MachineIdFormat() {
         <ArrowRight className="w-4 h-4 text-gray-400" />
         <span className="bg-white px-3 py-1 rounded border">2025</span>
         <ArrowRight className="w-4 h-4 text-gray-400" />
-        <span className="bg-white px-3 py-1 rounded border">94M</span>
+        <span className="bg-white px-3 py-1 rounded border">000</span>
         <ArrowRight className="w-4 h-4 text-gray-400" />
-        <span className="bg-white px-3 py-1 rounded border">019</span>
+        <span className="bg-white px-3 py-1 rounded border">000</span>
       </div>
       <p className="text-sm text-center text-gray-500 mt-2">Format: PREFIX-YEAR-SERIAL-CODE</p>
     </div>

@@ -6,20 +6,18 @@ export async function generateMachineQR() {
   try {
     const machineId = generateMachineId()
     const token = generateToken()
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000) 
 
-    // Create the machine document
     await setDoc(doc(db, "machines", machineId), {
       id: machineId,
       createdAt: new Date().toISOString(),
       linkedUsers: {},
-      pin: null, // Will be set during setup
+      pin: null,
       lastAuthAt: null,
       failedAttempts: 0,
       lockedUntil: null,
     })
 
-    // Store the link token
     await setDoc(doc(db, "machine_link_tokens", token), {
       machineId,
       expiresAt: expiresAt.toISOString(),

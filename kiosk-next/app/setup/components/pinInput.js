@@ -67,26 +67,29 @@ export function PinInput({
         {renderPinDisplay()}
       </div>
 
-      <div className="grid grid-cols-3 gap-4 justify-center">
-        {numberPad.map((row, rowIndex) =>
-          row.map((digit, colIndex) => (
-            <button
-              key={`${rowIndex}-${colIndex}`}
-              onClick={() => handlePinInput(digit)}
-              disabled={loading}
-              className={`w-16 h-16 text-xl font-medium rounded-lg transition-all duration-200
-                ${
-                  digit === "C" || digit === "⌫"
-                    ? "border-2 border-[#0e5f97] text-[#0e5f97] hover:bg-[#0e5f97]/10"
-                    : "bg-gray-50 hover:bg-gray-100 hover:scale-105"
-                }
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
-              `}
-            >
-              {digit}
-            </button>
-          )),
-        )}
+      {/* Number Pad */}
+      <div className="flex flex-col items-center justify-center gap-4">
+        {numberPad.map((row, rowIndex) => (
+          <div key={rowIndex} className="flex gap-4">
+            {row.map((digit, colIndex) => (
+              <button
+                key={`${rowIndex}-${colIndex}`}
+                onClick={() => handlePinInput(digit)}
+                disabled={loading}
+                className={`w-16 h-16 text-xl font-medium rounded-lg transition-all duration-200
+                  ${
+                    digit === "C" || digit === "⌫"
+                      ? "border-2 border-[#0e5f97] text-[#0e5f97] hover:bg-[#0e5f97]/10"
+                      : "bg-gray-50 hover:bg-gray-100 hover:scale-105"
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                `}
+              >
+                {digit}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
 
       {pinStep === "create" && pin.length === 4 && (

@@ -1,6 +1,23 @@
-import { Settings, Copy, Check, Info, Lock, Fingerprint } from "lucide-react"
+"use client"
+
+import { useState } from "react"
+import { Settings, Copy, Check, Info, Lock, Fingerprint, CheckCheck } from "lucide-react"
 
 export function MachineDetails({ machineId }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try{
+      await navigator.clipboard.writeText(machineId)
+      setCopied(true)
+
+      setTimeout(() => {setCopied(false)}, 2000)
+    } catch (err) {
+      console.error("Failed to copy: ", err)
+    }
+  }
+
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-md p-6">
@@ -17,10 +34,15 @@ export function MachineDetails({ machineId }) {
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">Machine ID</span>
               <button
-                onClick={() => navigator.clipboard.writeText(machineId)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={handleCopy}
+                className="relative group p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Copy className="h-4 w-4" />
+                {copied ?  <CheckCheck className="h-4 w-4 text-green-500" /> :
+                  <Copy className="h-4 w-4"/>
+                }
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 transition-opacity group-hover:opacity-100 whitespace-nowrap">
+                  {copied ? "Copied!" : "Copy to clipboard"}
+                </span>
               </button>
             </div>
             <div className="flex items-center gap-2">

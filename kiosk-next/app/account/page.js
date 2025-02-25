@@ -29,13 +29,11 @@ export default function Account() {
     { id: "settings", label: "Settings", icon: Settings },
   ]
 
-  // Handle successful PIN authentication
   const handleAuthSuccess = () => {
     setIsAuthenticated(true)
     setShowPinModal(false)
   }
 
-  // Handle logout
   const handleLogout = () => {
     setIsAuthenticated(false)
     setShowPinModal(true)
