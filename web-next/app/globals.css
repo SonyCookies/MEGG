@@ -2,25 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 220 33% 99%;
-  --foreground: 206 84% 32%;
-  --primary: 206 84% 32%;
-  --primary-dark: 207 77% 25%;
-  --accent: 14 97% 52%;
-  --secondary: 39 78% 65%;
-}
-
-.dark {
-  --background: 207 77% 25%;
-  --foreground: 220 33% 99%;
-  --primary: 220 33% 99%;
-  --primary-dark: 206 84% 32%;
-  --accent: 14 97% 52%;
-  --secondary: 39 78% 65%;
-}
 
 body {
-  @apply bg-background text-foreground font-poppins;
+  background-image: url("/background.svg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* Ensures it stays in place when scrolling */
 }
-

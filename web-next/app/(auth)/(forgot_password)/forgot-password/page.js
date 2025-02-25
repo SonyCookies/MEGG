@@ -89,8 +89,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-new-white flex flex-col items-center justify-center sm:p-8">
-      <div className="bg-white shadow-md w-full sm:max-w-lg md:max-w-xl xl:max-w-6xl min-h-screen sm:min-h-[700px] flex flex-col xl:flex-row sm:rounded-2xl overflow-hidden">
+    <div className="min-h-screen bg-new-white sm:bg-transparent flex flex-col items-center justify-center sm:p-8">
+      <div className="bg-white shadow sm:border w-full sm:max-w-lg md:max-w-xl xl:max-w-6xl min-h-screen sm:min-h-[700px] flex flex-col xl:flex-row sm:rounded-2xl overflow-hidden">
         <div className="w-full h-[200px] xl:h-auto relative">
           <Image src="/login_bg_mobile.svg" alt="Login Background" fill className="object-cover flex xl:hidden" />
           <Image

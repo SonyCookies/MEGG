@@ -63,7 +63,7 @@ export default function SettingsMenu({
   const router = useRouter();
 
   const signOut = () => {
-    router.push("/");
+    router.push("/login");
   };
 
   const selectedItem = menuItems
