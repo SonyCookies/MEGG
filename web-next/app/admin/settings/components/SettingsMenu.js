@@ -92,7 +92,7 @@ export default function SettingsMenu({
       {/* Mobile Dropdown */}
       <div
         ref={dropdownRef}
-        className="block sm:hidden p-6 rounded-2xl shadow bg-white border relative"
+        className="block sm:hidden lg:block xl:hidden p-6 rounded-2xl shadow bg-white border relative"
       >
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -159,7 +159,7 @@ export default function SettingsMenu({
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="hidden sm:flex flex-col gap-6 p-8 bg-white border xl:border-none xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full sm:w-72">
+      <div className="hidden sm:flex lg:hidden xl:flex flex-col gap-6 p-8 bg-white border xl:border xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full sm:w-72">
         {menuItems.map((section) => (
           <div key={section.title} className="flex flex-col gap-2">
             <h2 className="text-sm font-medium text-gray-500">

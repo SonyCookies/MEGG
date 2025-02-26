@@ -24,36 +24,36 @@ export default function DashboardPage() {
   const timeoutRef = useRef()
 
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const user = localStorage.getItem('user')
-      if (!user) {
-        router.replace('/login')
-        return false
-      }
-      return true
-    }
+  // useEffect(() => {
+  //   const checkAuth = () => {
+  //     const user = localStorage.getItem('user')
+  //     if (!user) {
+  //       router.replace('/login')
+  //       return false
+  //     }
+  //     return true
+  //   }
 
-    if (!checkAuth()) return
+  //   if (!checkAuth()) return
 
-    const events = ['mousemove', 'keydown', 'click', 'scroll']
-    const resetTimer = () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => {
-        localStorage.removeItem('user')
-        router.replace('/login')
-      }, 60 * 1000) // 15 minutes
-    }
+  //   const events = ['mousemove', 'keydown', 'click', 'scroll']
+  //   const resetTimer = () => {
+  //     if (timeoutRef.current) clearTimeout(timeoutRef.current)
+  //     timeoutRef.current = setTimeout(() => {
+  //       localStorage.removeItem('user')
+  //       router.replace('/login')
+  //     }, 60 * 1000) // 15 minutes
+  //   }
 
-    resetTimer()
+  //   resetTimer()
 
-    events.forEach(event => window.addEventListener(event, resetTimer))
+  //   events.forEach(event => window.addEventListener(event, resetTimer))
 
-    return () => {
-      events.forEach(event => window.removeEventListener(event, resetTimer))
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    }
-  }, [router]) 
+  //   return () => {
+  //     events.forEach(event => window.removeEventListener(event, resetTimer))
+  //     if (timeoutRef.current) clearTimeout(timeoutRef.current)
+  //   }
+  // }, [router]) 
       
     
 
