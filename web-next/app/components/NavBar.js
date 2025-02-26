@@ -78,18 +78,18 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-      case "/overview":
-        return "Dashboard";
-      case "/settings":
+      case "/admin/overview":
+        return "Overview";
+      case "/admin/settings":
         return "Settings";
-      case "/profile":
+      case "/admin/profile":
         return "Profile";
-      case "/inventory":
+      case "/admin/inventory":
         return "Inventory";
-      case "/machines":
+      case "/admin/machines":
         return "Machines";
       default:
-        return "Dashboard";
+        return "Overview";
     }
   };
 

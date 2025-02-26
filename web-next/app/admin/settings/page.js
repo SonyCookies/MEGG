@@ -72,7 +72,7 @@ export default function EditProfilePage() {
             />
 
             <div className="w-full">
-              <div className="xl:overflow-hidden rounded-2xl xl:shadow xl:bg-white border flex flex-col sm:flex-row gap-6 xl:gap-0">
+              <div className="xl:overflow-hidden rounded-2xl xl:shadow xl:bg-white xl:border flex flex-col sm:flex-row gap-6 xl:gap-0">
                 <SettingsMenu
                   setSelectedComponent={setSelectedComponent}
                   selectedComponent={selectedComponent}

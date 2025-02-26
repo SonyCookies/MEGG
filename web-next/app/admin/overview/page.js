@@ -38,9 +38,10 @@ export default function OverviewPage() {
 
             {/* right */}
             <div className="w-full flex gap-6">
+              {/* main content here */}
               <div className="flex flex-1 flex-col gap-6">
                 <div className="flex flex-col p-6 rounded-2xl shadow bg-white border">
-                  Content goes here (scrollable)
+                  
                 </div>
               </div>
 

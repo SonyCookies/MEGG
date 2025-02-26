@@ -17,7 +17,7 @@ export default function MachinesPage() {
   const router = useRouter()
 
   const handleManageMachines = () => {
-    router.push('/settings?component=AddMachines')
+    router.push('/admin/settings?component=AddMachines')
   }
 
   const toggleSidebar = () => {
@@ -75,6 +75,7 @@ export default function MachinesPage() {
                       {totalMachines}
                     </h1>
                   </div>
+
                   <div className="col-span-3 md:col-span-2 bg-new-yellow p-6 rounded-2xl shadow">
                     <h1 className="text-xl text-white flex items-center gap-2">
                       <Activity className="w-5 h-5" /> Active:
