@@ -95,7 +95,7 @@ export default function DeleteAccount() {
 
   return (
     <>
-      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white xl:bg-none rounded-2xl xl:rounded-none shadow-md xl:shadow-none w-full">
+      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white border xl:border-none xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full">
         {/* Global validation message */}
         {globalMessage && (
           <div

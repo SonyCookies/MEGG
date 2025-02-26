@@ -5,7 +5,7 @@ import { Navbar } from "../../components/NavBar";
 import { Sidebar } from "../../components/Sidebar";
 import Notifications from "../../components/ui/NotificationDesktop";
 
-export default function OverviewPage() {
+export default function NotificationPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -38,10 +38,9 @@ export default function OverviewPage() {
 
             {/* right */}
             <div className="w-full flex gap-6">
-              {/* main content here */}
               <div className="flex flex-1 flex-col gap-6">
                 <div className="flex flex-col p-6 rounded-2xl shadow bg-white border">
-                  
+                  Notifications (scrollable)
                 </div>
               </div>
 

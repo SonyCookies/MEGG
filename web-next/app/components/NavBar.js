@@ -1,120 +1,142 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Menu, User, LogOut, X } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
-import { usePathname } from "next/navigation"
-import { auth, db } from "../config/firebaseConfig.js"
-import { doc, getDoc } from "firebase/firestore"
-import { signOut } from "firebase/auth"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef } from "react";
+import { Menu, User, LogOut, X } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { auth, db } from "../config/firebaseConfig.js";
+import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import NotificationMobile from "./ui/NotificationMobile.js";
 
 export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+
   const [userData, setUserData] = useState({
     username: "",
     email: "",
     profileImageUrl: "",
-  })
-  const profileRef = useRef(null)
-  const pathname = usePathname()
-  const router = useRouter()
+  });
+  const profileRef = useRef(null);
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     // Listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         try {
-          const docRef = doc(db, "users", user.uid)
-          const docSnap = await getDoc(docRef)
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
-            const data = docSnap.data()
+            const data = docSnap.data();
             setUserData({
               username: data.username || "User",
               email: user.email || "",
-              profileImageUrl: data.profileImageUrl || "/default.png" ,
-            })
-            
+              profileImageUrl: data.profileImageUrl || "/default.png",
+            });
           }
         } catch (error) {
-          console.error("Error fetching user data:", error)
+          console.error("Error fetching user data:", error);
         }
       }
-    })
+    });
 
-    return () => unsubscribe()
-  }, [])
+    return () => unsubscribe();
+  }, []);
 
   const toggleProfileMenu = () => {
-    setProfileOpen((prev) => !prev)
-  }
+    setProfileOpen((prev) => !prev);
+  };
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth)
-      router.push("/login") // Redirect to login page after sign out
+      await signOut(auth);
+      router.push("/login"); // Redirect to login page after sign out
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Error signing out:", error);
     }
-  }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setProfileOpen(false)
+        setProfileOpen(false);
       }
-    }
+    };
 
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-      case "/overview":
-        return "Dashboard"
-      case "/settings":
-        return "Settings"
-      case "/profile":
-        return "Profile"
-      case "/inventory":
-        return "Inventory"
-      case "/machines":
-        return "Machines"
+      case "/admin/overview":
+        return "Overview";
+      case "/admin/settings":
+        return "Settings";
+      case "/admin/profile":
+        return "Profile";
+      case "/admin/inventory":
+        return "Inventory";
+      case "/admin/machines":
+        return "Machines";
       default:
-        return "Dashboard"
+        return "Overview";
     }
-  }
+  };
 
   return (
-    <nav className="sticky top-4 z-50 bg-red500">
+    <nav className="sticky top-4 z-40 bg-red500">
       <div className="relative container mx-auto">
         {/* navbar container */}
-        <div className="bg-white p-4 rounded-2xl shadow flex items-center justify-between">
+        <div className="bg-white border p-4 rounded-2xl shadow flex items-center justify-between">
           {/* left */}
           <div className="flex items-center gap-2 w-full">
             {/* sidebar button for mobile */}
-            <button onClick={toggleMobileSidebar} className="p-2 hover:bg-gray-300/20 rounded-lg flex xl:hidden">
+            <button
+              onClick={toggleMobileSidebar}
+              className="p-2 hover:bg-gray-300/20 rounded-lg flex xl:hidden"
+            >
               {mobileSidebarOpen ? <X /> : <Menu />}
             </button>
 
-            <h1 className="hidden md:flex font-semibold text-xl lg:text-2xl xl:ps-2 ">{getPageTitle()}</h1>
+            <h1 className="hidden md:flex font-semibold text-xl lg:text-2xl xl:ps-2 ">
+              {getPageTitle()}
+            </h1>
           </div>
           {/* Middle */}
           <div className="flex items-center justify-center w-full">
             <div className="relative rounded-full w-10 h-10 overflow-hidden">
-              <Image src="/logo.png" alt="Megg Logo" fill className="object-cover" priority />
+              <Image
+                src="/logo.png"
+                alt="Megg Logo"
+                fill
+                className="object-cover"
+                priority
+              />
             </div>
           </div>
           {/* right */}
-          <div className="flex items-center justify-end w-full">
+          <div className="flex items-center gap-2 justify-end w-full">
+            {/* Notification */}
+            <NotificationMobile
+              notificationOpen={notificationOpen}
+              setNotificationOpen={setNotificationOpen}
+            />
+
             {/* profile */}
-            <button onClick={toggleProfileMenu} className="flex items-center gap-2">
+            <button
+              onClick={toggleProfileMenu}
+              className="flex items-center gap-2"
+            >
               {/* name and role */}
               <div className="hidden lg:flex flex-col text-end">
                 <h3 className="font-medium">{userData.username}</h3>
@@ -141,7 +163,10 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
             className="absolute bg-white rounded-2xl shadow right-0 top-full mt-4 w-56 overflow-hidden"
           >
             <div className="flex flex-col divide-y">
-              <Link href="/admin/settings" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20">
+              <Link
+                href="/admin/profile"
+                className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20"
+              >
                 <User className="w-5 h-5" />
                 My profile
               </Link>
@@ -157,6 +182,5 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
         )}
       </div>
     </nav>
-  )
+  );
 }
-

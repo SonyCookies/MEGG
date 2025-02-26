@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, Ellipsis, Trash, Check } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function NotificationMobile({
   notificationOpen,
@@ -11,6 +12,11 @@ export default function NotificationMobile({
   const [activeAction, setActiveAction] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const notificationRef = useRef(null);
+
+  const router = useRouter();
+  const handleNotification = () => {
+    router.push("/admin/notifications");
+  };
 
   const notifications = [
     {
@@ -111,7 +117,7 @@ export default function NotificationMobile({
                   return (
                     <div key={notification.id} className="relative">
                       <div
-                        role="button"
+                        role="button" onClick={handleNotification}
                         className="bg-white transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full"
                       >
                         <div className="flex items-center gap-4">
