@@ -20,7 +20,7 @@ export function Sidebar({ mobileSidebarOpen, toggleMobileSidebar }) {
     <>
       {/* sidebar desktop */}
       <aside className="transition-all duration-300 ease-in-out hidden xl:flex sticky top-28 self-start w-80">
-        <div className="p-6 flex flex-col gap-2 bg-white rounded-2xl shadow-md w-full">
+        <div className="p-6 flex flex-col gap-2 bg-white border rounded-2xl shadow w-full">
           {navItems.map((item) => (
             <Link
               key={item.href}

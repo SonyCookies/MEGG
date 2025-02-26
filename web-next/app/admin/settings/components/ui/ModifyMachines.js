@@ -64,7 +64,7 @@ export default function ModifyMachines() {
 
   return (
     <>
-      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white xl:bg-none rounded-2xl xl:rounded-none shadow-md xl:shadow-none w-full">
+      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white border xl:border-none xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full">
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-1">
             <h3 className="text-xl font-medium">Modify Machines</h3>
@@ -78,7 +78,7 @@ export default function ModifyMachines() {
               <button
                 key={machine.id}
                 type="button"
-                className="col-span-4 lg:col-span-2 bg-gray-300/20 rounded-lg shadow p-4 flex items-center cursor-pointer hover:bg-gray-300/40 transition"
+                className="col-span-4 lg:col-span-2 rounded-lg border p-4 flex items-center cursor-pointer hover:bg-gray-300/30 transition-colors duration-150"
                 onClick={() => openEditModal(machine)}
               >
                 <div className="flex items-center gap-4">
@@ -107,7 +107,7 @@ export default function ModifyMachines() {
       {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-40 p-4">
-          <div className="p-6 lg:p-8 bg-white rounded-2xl shadow-lg z-50 w-full max-w-md flex flex-col gap-6 relative">
+          <div className="p-6 lg:p-8 bg-white border rounded-2xl z-50 w-full max-w-md flex flex-col gap-6 relative">
             <div className="flex flex-col items-center gap-4">
               <Settings className="w-12 h-12 text-blue-500" />
 

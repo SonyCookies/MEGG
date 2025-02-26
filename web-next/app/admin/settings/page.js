@@ -54,7 +54,7 @@ export default function EditProfilePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col gap-6 bg-new-white p-4 lg:p-6">
+    <div className="min-h-screen flex flex-col gap-6 bg-gray-300/10 p-4 lg:p-6">
       <Navbar
         sidebarOpen={sidebarOpen}
         mobileSidebarOpen={mobileSidebarOpen}
@@ -72,7 +72,7 @@ export default function EditProfilePage() {
             />
 
             <div className="w-full">
-              <div className="xl:overflow-hidden rounded-2xl xl:shadow-md xl:bg-white flex flex-col sm:flex-row gap-6 xl:gap-0">
+              <div className="xl:overflow-hidden rounded-2xl xl:shadow xl:bg-white xl:border flex flex-col sm:flex-row gap-6 xl:gap-0">
                 <SettingsMenu
                   setSelectedComponent={setSelectedComponent}
                   selectedComponent={selectedComponent}

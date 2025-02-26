@@ -18,7 +18,7 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col gap-6 bg-new-white p-4 lg:p-6">
+    <div className="min-h-screen flex flex-col gap-6 bg-gray-300/10 p-4 lg:p-6">
       <Navbar
         sidebarOpen={sidebarOpen}
         mobileSidebarOpen={mobileSidebarOpen}
@@ -39,7 +39,7 @@ export default function InventoryPage() {
             {/* right */}
             <div className="w-full flex gap-6">
               <div className="flex flex-1 flex-col gap-6">
-                <div className="flex flex-col p-6 rounded-2xl shadow-md bg-white">
+                <div className="flex flex-col p-6 rounded-2xl shadow bg-white border">
                   Content goes here (scrollable)
                 </div>
               </div>
