@@ -86,7 +86,7 @@ export default function NotificationMobile({
       {/* Notification Button */}
       <button
         onClick={() => setNotificationOpen((prev) => !prev)}
-        className="p-2 hover:bg-gray-300/20 rounded-lg flex lg:hidden relative notification-toggle"
+        className="p-2 hover:bg-gray-300/20 rounded-lg flex xl:hidden relative notification-toggle"
       >
         <Bell />
       </button>
