@@ -24,41 +24,6 @@ export default function DashboardPage() {
   const timeoutRef = useRef()
 
 
-  // useEffect(() => {
-  //   const checkAuth = () => {
-  //     const user = localStorage.getItem('user')
-  //     if (!user) {
-  //       router.replace('/login')
-  //       return false
-  //     }
-  //     return true
-  //   }
-
-  //   if (!checkAuth()) return
-
-  //   const events = ['mousemove', 'keydown', 'click', 'scroll']
-  //   const resetTimer = () => {
-  //     if (timeoutRef.current) clearTimeout(timeoutRef.current)
-  //     timeoutRef.current = setTimeout(() => {
-  //       localStorage.removeItem('user')
-  //       router.replace('/login')
-  //     }, 60 * 1000) // 15 minutes
-  //   }
-
-  //   resetTimer()
-
-  //   events.forEach(event => window.addEventListener(event, resetTimer))
-
-  //   return () => {
-  //     events.forEach(event => window.removeEventListener(event, resetTimer))
-  //     if (timeoutRef.current) clearTimeout(timeoutRef.current)
-  //   }
-  // }, [router]) 
-      
-    
-
-
-
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setChartType("total") // Reset chart type when switching tabs
@@ -72,7 +37,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white p-4 shadow-sm lg:py-6">
+      <header className="sticky top-0 z-10 bg-red-500 p-4 shadow-sm lg:py-6">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 lg:gap-8">
@@ -110,7 +75,7 @@ export default function DashboardPage() {
         {/* Tab Buttons */}
         <div className="mb-6">
           <div className="flex justify-center">
-            <div className="inline-flex rounded-3xl bg-white p-2 shadow-md">
+            <div className="inline-flex rounded-3xl bg-red-500 p-2 shadow-md">
               {tabs.map((tab, index) => (
                 <button
                   key={tab.id}
@@ -128,11 +93,11 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content */}
-        <div className="lg:grid lg:grid-cols-12 lg:gap-6">
+        <div className="lg:grid lg:grid-cols-12 bg-green-500 lg:gap-6">
           {/* Left Column */}
-          <div className="lg:col-span-8 space-y-4 lg:space-y-6">
+          <div className="lg:col-span-8 space-y-4 lg:space-y-6 bg-pink-500">
             {/* Egg Size/Defect Overview Section */}
-            <div className="rounded-3xl bg-white p-6 shadow-sm lg:p-8">
+            <div className="rounded-3xl bg-yellow-500 p-6 shadow-sm lg:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-4 sm:space-y-0">
                 <h3 className="font-semibold text-primary text-lg">
                   {activeTab === "sizing" ? "Egg Size Overview" : "Egg Defect Overview"}
