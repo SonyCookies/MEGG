@@ -88,6 +88,8 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
         return "Inventory";
       case "/admin/machines":
         return "Machines";
+      case "/admin/notifications":
+        return "Notifications";
       default:
         return "Overview";
     }
@@ -103,7 +105,7 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
             {/* sidebar button for mobile */}
             <button
               onClick={toggleMobileSidebar}
-              className="p-2 hover:bg-gray-300/20 rounded-lg flex xl:hidden"
+              className="p-2 hover:bg-gray-300/20 rounded-lg flex lg:hidden"
             >
               {mobileSidebarOpen ? <X /> : <Menu />}
             </button>
@@ -138,11 +140,17 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
               className="flex items-center gap-2"
             >
               {/* name and role */}
-              <div className="hidden lg:flex flex-col text-end">
-                <h3 className="font-medium">{userData.username}</h3>
-                <span className="text-gray-500 text-sm">{userData.email}</span>
+              <div className="hidden xl:flex flex-col text-end">
+                <div className="flex flex-col">
+                  <h3 className="font-medium">
+                    {userData.username || "Name here"}
+                  </h3>
+                  <span className="text-gray-500 text-sm">
+                    {userData.email || "name@example.com"}
+                  </span>
+                </div>
               </div>
-
+              {/* profile image */}
               <div className="relative rounded-full w-10 h-10 b-red-500 overflow-hidden">
                 <Image
                   src={userData.profileImageUrl || "/default.png"}
@@ -160,23 +168,50 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
         {profileOpen && (
           <div
             ref={profileRef}
-            className="absolute bg-white rounded-2xl shadow right-0 top-full mt-4 w-56 overflow-hidden"
+            className="absolute bg-white rounded-2xl shadow right-0 top-full mt-4 w-72 overflow-hidden border"
           >
-            <div className="flex flex-col divide-y">
-              <Link
-                href="/admin/profile"
-                className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20"
-              >
-                <User className="w-5 h-5" />
-                My profile
-              </Link>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20 text-red-600 w-full"
-              >
-                <LogOut className="w-5 h-5" />
-                Sign out
-              </button>
+            <div className="flex flex-col gap-4 p-4 ">
+              {/* profile */}
+
+              <div className="flex items-center gap-2">
+                <div className="relative rounded-full w-10 h-10 b-red-500 overflow-hidden">
+                  <Image
+                    src={userData.profileImageUrl || "/default.png"}
+                    alt="Profile picture"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="font-medium">
+                    {userData.username || "Name here"}
+                  </h3>
+                  <span className="text-gray-500 text-sm">
+                    {userData.email || "name@example.com"}
+                  </span>
+                </div>
+              </div>
+
+              <hr />
+
+              {/* menus */}
+              <div className="flex flex-col">
+                <Link
+                  href="/admin/profile"
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20 rounded-lg"
+                >
+                  <User className="w-5 h-5" />
+                  My profile
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-gray-300/20 text-red-600 w-full rounded-lg"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sign out
+                </button>
+              </div>
             </div>
           </div>
         )}
