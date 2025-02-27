@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { collection, query, orderBy, limit, startAfter, getDocs, getCountFromServer } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
-import { addAccessLog } from "../../utils/logging"
+// import { addAccessLog } from "../../utils/logging"
 
 // Constants
 const ITEMS_PER_PAGE = 10
@@ -70,6 +70,7 @@ const getDefectStyle = (type) => {
 
 export default function LogsTab() {
   // State
+  const [machineId, setMachineId] = useState(null)
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -91,6 +92,25 @@ export default function LogsTab() {
     sortBy: "newest",
   })
 
+  // Fetch session data to get machineId
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session")
+        if (!response.ok) {
+          throw new Error("Failed to fetch session")
+        }
+        const data = await response.json()
+        setMachineId(data.machineId)
+      } catch (err) {
+        console.error("Error fetching session:", err)
+        setError("Failed to authenticate session")
+      }
+    }
+
+    fetchSession()
+  }, [])
+
   // Fetch total count
   useEffect(() => {
     const fetchTotalCount = async () => {
@@ -103,67 +123,84 @@ export default function LogsTab() {
       }
     }
 
-    fetchTotalCount()
-  }, [])
+    if (machineId) {
+      fetchTotalCount()
+    }
+  }, [machineId])
 
   // Fetch logs
-  const fetchLogs = useCallback(async (pageNumber, lastDoc = null) => {
-    try {
-      setLoading(true)
-      setError(null)
-      console.log("Fetching logs for page:", pageNumber)
-
-      const logsRef = collection(db, "defect_logs")
-      let q = query(logsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
-
-      if (lastDoc && pageNumber > 1) {
-        q = query(logsRef, orderBy("timestamp", "desc"), startAfter(lastDoc), limit(ITEMS_PER_PAGE))
+  const fetchLogs = useCallback(
+    async (pageNumber, lastDoc = null) => {
+      if (!machineId) {
+        setError("No machine ID found")
+        return
       }
 
-      const querySnapshot = await getDocs(q)
-      const fetchedLogs = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
+      try {
+        setLoading(true)
+        setError(null)
+        console.log("Fetching logs for page:", pageNumber)
 
-      // Update last visible document for next pagination
-      const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-      setLastVisible(lastVisible)
+        const logsRef = collection(db, "defect_logs")
+        let q = query(logsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
 
-      // Check if we have more pages
-      setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE)
+        if (lastDoc && pageNumber > 1) {
+          q = query(logsRef, orderBy("timestamp", "desc"), startAfter(lastDoc), limit(ITEMS_PER_PAGE))
+        }
 
-      setLogs(fetchedLogs)
+        const querySnapshot = await getDocs(q)
+        const fetchedLogs = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
 
-      // Log successful fetch
-      await addAccessLog({
-        action: "view_logs",
-        status: "success",
-        details: `Fetched ${fetchedLogs.length} logs`,
-      })
+        // Update last visible document for next pagination
+        const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
+        setLastVisible(lastVisible)
 
-      // Remove setSuccess calls in fetchLogs
-      setSuccess("Logs loaded successfully")
-    } catch (err) {
-      console.error("Error fetching logs:", err)
-      setError("Failed to load logs. Please try again later.")
+        // Check if we have more pages
+        setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE)
 
-      // Log error
-      await addAccessLog({
-        action: "view_logs",
-        status: "error",
-        details: "Failed to fetch logs",
-        error: err.message,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+        setLogs(fetchedLogs)
+
+        // Log successful fetch
+        // await addAccessLog(
+        //   {
+        //     action: "view_logs",
+        //     status: "success",
+        //     details: `Fetched ${fetchedLogs.length} logs`,
+        //   },
+        //   machineId,
+        // )
+
+        setSuccess("Logs loaded successfully")
+      } catch (err) {
+        console.error("Error fetching logs:", err)
+        setError("Failed to load logs. Please try again later.")
+
+        // Log error
+        // await addAccessLog(
+        //   {
+        //     action: "view_logs",
+        //     status: "error",
+        //     details: "Failed to fetch logs",
+        //     error: err.message,
+        //   },
+        //   machineId,
+        // )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [machineId],
+  )
 
   // Initial fetch
   useEffect(() => {
-    fetchLogs(1)
-  }, [fetchLogs])
+    if (machineId) {
+      fetchLogs(1)
+    }
+  }, [fetchLogs, machineId])
 
   // Handle page changes
   const handlePageChange = async (newPage) => {
@@ -203,6 +240,11 @@ export default function LogsTab() {
 
   // Export to CSV
   const handleExport = async () => {
+    if (!machineId) {
+      setError("No machine ID found")
+      return
+    }
+
     try {
       const csvContent = [
         ["Timestamp", "Batch Number", "Defect Type", "Confidence Score"],
@@ -227,25 +269,30 @@ export default function LogsTab() {
       URL.revokeObjectURL(url)
 
       // Log export
-      await addAccessLog({
-        action: "export_logs",
-        status: "success",
-        details: `Exported ${filteredLogs.length} logs`,
-      })
+      // await addAccessLog(
+      //   {
+      //     action: "export_logs",
+      //     status: "success",
+      //     details: `Exported ${filteredLogs.length} logs`,
+      //   },
+      //   machineId,
+      // )
 
-      // Remove setSuccess call in handleExport
       setSuccess("Logs exported successfully")
     } catch (err) {
       console.error("Error exporting logs:", err)
       setError("Failed to export logs")
 
       // Log error
-      await addAccessLog({
-        action: "export_logs",
-        status: "error",
-        details: "Failed to export logs",
-        error: err.message,
-      })
+      // await addAccessLog(
+      //   {
+      //     action: "export_logs",
+      //     status: "error",
+      //     details: "Failed to export logs",
+      //     error: err.message,
+      //   },
+      //   machineId,
+      // )
     }
   }
 
@@ -501,7 +548,7 @@ export default function LogsTab() {
           </button>
 
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalItems / ITEMS_PER_PAGE) }, (_, i) => {
+            {Array.from({ length: Math.min(5, Math.ceil(totalItems / ITEMS_PER_PAGE)) }, (_, i) => {
               const pageNumber = i + 1
               return (
                 <button

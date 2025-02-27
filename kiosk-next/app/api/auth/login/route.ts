@@ -28,10 +28,9 @@ export async function POST(request) {
     if (!machineDoc.exists()) {
       await addAccessLog({
         action: "login",
-        machineId,
         status: "error",
         details: "Machine not found",
-      })
+      }, machineId)
       return NextResponse.json({ error: "Machine not found" }, { status: 404 })
     }
 
@@ -74,10 +73,9 @@ export async function POST(request) {
 
           await addAccessLog({
             action: "login",
-            machineId,
             status: "locked",
             details: "Account locked due to too many failed attempts",
-          })
+          }, machineId)
 
           return NextResponse.json(
             {
@@ -95,10 +93,9 @@ export async function POST(request) {
 
         await addAccessLog({
           action: "login",
-          machineId,
           status: "failed",
           details: `Failed login attempt (${newAttempts}/${MAX_ATTEMPTS})`,
-        })
+        }, machineId)
 
         return NextResponse.json(
           {
@@ -130,10 +127,9 @@ export async function POST(request) {
     // Bugs Here
     await addAccessLog({
       action: "login",
-      machineId,
       status: "success",
       details: "Login successful",
-    })
+    }, machineId)
     //Bugs Here
 
 

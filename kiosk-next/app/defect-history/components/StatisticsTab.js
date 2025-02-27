@@ -17,7 +17,7 @@ import {
   RefreshCcw,
   Filter,
 } from "lucide-react"
-import { addAccessLog } from "../../utils/logging"
+// import { addAccessLog } from "../../utils/logging"
 
 // Enhanced color palette with gradients
 const COLORS = {
@@ -162,22 +162,22 @@ export default function StatisticsTab() {
       setDefectLogs(logs)
 
       // Log successful data fetch
-      await addAccessLog({
-        action: "statistics_view",
-        status: "success",
-        details: `Statistics data fetched successfully - ${logs.length} records`,
-      })
+      // await addAccessLog({
+      //   action: "statistics_view",
+      //   status: "success",
+      //   details: `Statistics data fetched successfully - ${logs.length} records`,
+      // })
     } catch (err) {
       console.error("Error fetching defect logs:", err)
       setError("Failed to load statistics. Please try again.")
 
       // Log error
-      await addAccessLog({
-        action: "statistics_view",
-        status: "error",
-        details: "Failed to fetch statistics data",
-        error: err.message,
-      })
+      // await addAccessLog({
+      //   action: "statistics_view",
+      //   status: "error",
+      //   details: "Failed to fetch statistics data",
+      //   error: err.message,
+      // })
     } finally {
       setLoading(false)
     }

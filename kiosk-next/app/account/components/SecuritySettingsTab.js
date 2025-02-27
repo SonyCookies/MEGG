@@ -1,40 +1,72 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LogOut, Lock, Shield, AlertCircle, Clock, Key, Info, Unlink } from "lucide-react"
+import { Shield, Lock, AlertTriangle, CheckCircle2, X, Unlink, Clock } from "lucide-react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
 import { addAccessLog } from "../../utils/logging"
+import { useAutoLogout } from "../../hooks/useAutoLogout"
 
-export default function SecuritySettingsTab({ onLogout }) {
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
-  const [showLockDialog, setShowLockDialog] = useState(false)
-  const [showUnlinkDialog, setShowUnlinkDialog] = useState(false)
-  const [autoLockEnabled, setAutoLockEnabled] = useState(true)
-  const [requirePinForSettings, setRequirePinForSettings] = useState(true)
-  const [autoLockTime, setAutoLockTime] = useState(30) // minutes
+const AUTO_LOCK_TIMES = [
+  { value: 1, label: "1 minute" },
+  { value: 5, label: "5 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+]
+
+export default function SecuritySettingsTab() {
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState({
+    autoLogout: {
+      enabled: true,
+      timeout: 15,
+    },
+  })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [machineId, setMachineId] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [showUnlinkDialog, setShowUnlinkDialog] = useState(false)
+  const [linkStatus, setLinkStatus] = useState({
+    isLinked: false,
+    linkedUsers: null,
+  })
 
-  // Fetch current settings
+  const { handleLogout } = useAutoLogout(settings.autoLogout.enabled, settings.autoLogout.timeout)
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const machineId = localStorage.getItem("machineId")
-        if (!machineId) {
-          setError("Machine ID not found")
-          return
+        setLoading(true)
+
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Failed to verify session")
         }
 
-        const machineRef = doc(db, "machines", machineId)
+        const currentMachineId = sessionData.machineId
+        setMachineId(currentMachineId)
+
+        const machineRef = doc(db, "machines", currentMachineId)
         const machineDoc = await getDoc(machineRef)
 
         if (machineDoc.exists()) {
           const data = machineDoc.data()
-          setAutoLockEnabled(data.autoLockEnabled ?? true)
-          setRequirePinForSettings(data.requirePinForSettings ?? true)
-          setAutoLockTime(data.autoLockTime ?? 30)
+          setSettings({
+            autoLogout: {
+              enabled: data.autoLogoutEnabled ?? true,
+              timeout: data.autoLogoutTimeout ?? 15,
+            },
+          })
+
+          const linkedUsers = data.linkedUsers || {}
+          setLinkStatus({
+            isLinked: Object.keys(linkedUsers).length > 0,
+            linkedUsers,
+          })
         }
       } catch (err) {
         console.error("Error fetching security settings:", err)
@@ -47,318 +79,267 @@ export default function SecuritySettingsTab({ onLogout }) {
     fetchSettings()
   }, [])
 
-  const handleAutoLockToggle = async () => {
+  const handleSettingChange = async (section, key, value) => {
     try {
+      setSaving(true)
       setError("")
       setSuccess("")
-      const machineId = localStorage.getItem("machineId")
-      if (!machineId) throw new Error("Machine ID not found")
 
-      const machineRef = doc(db, "machines", machineId)
-      await updateDoc(machineRef, {
-        autoLockEnabled: !autoLockEnabled,
+      setSettings((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: value,
+        },
+      }))
+
+      const updateData = {
+        [`${section}${key.charAt(0).toUpperCase() + key.slice(1)}`]: value,
         updatedAt: new Date().toISOString(),
-      })
-
-      setAutoLockEnabled(!autoLockEnabled)
-      setSuccess("Auto-lock settings updated successfully")
-
-      // Log the change
-      await addAccessLog({
-        action: "settings_update",
-        details: `Auto-lock ${!autoLockEnabled ? "enabled" : "disabled"}`,
-        status: "success",
-      })
-    } catch (err) {
-      console.error("Error updating auto-lock settings:", err)
-      setError("Failed to update auto-lock settings")
-    }
-  }
-
-  const handlePinRequirementToggle = async () => {
-    try {
-      setError("")
-      setSuccess("")
-      const machineId = localStorage.getItem("machineId")
-      if (!machineId) throw new Error("Machine ID not found")
+      }
 
       const machineRef = doc(db, "machines", machineId)
-      await updateDoc(machineRef, {
-        requirePinForSettings: !requirePinForSettings,
-        updatedAt: new Date().toISOString(),
-      })
+      await updateDoc(machineRef, updateData)
 
-      setRequirePinForSettings(!requirePinForSettings)
-      setSuccess("PIN requirement settings updated successfully")
+      await addAccessLog(
+        {
+          action: "settings_update",
+          details: `Updated ${section}.${key} to ${value}`,
+          status: "success",
+        },
+        machineId,
+      )
 
-      // Log the change
-      await addAccessLog({
-        action: "settings_update",
-        details: `PIN requirement for settings ${!requirePinForSettings ? "enabled" : "disabled"}`,
-        status: "success",
-      })
+      setSuccess("Settings updated successfully")
     } catch (err) {
-      console.error("Error updating PIN requirement settings:", err)
-      setError("Failed to update PIN requirement settings")
-    }
-  }
+      console.error("Error updating settings:", err)
+      setError("Failed to update settings")
 
-  const handleAutoLockTimeChange = async (minutes) => {
-    try {
-      setError("")
-      setSuccess("")
-      const machineId = localStorage.getItem("machineId")
-      if (!machineId) throw new Error("Machine ID not found")
-
-      const machineRef = doc(db, "machines", machineId)
-      await updateDoc(machineRef, {
-        autoLockTime: minutes,
-        updatedAt: new Date().toISOString(),
-      })
-
-      setAutoLockTime(minutes)
-      setSuccess("Auto-lock time updated successfully")
-
-      // Log the change
-      await addAccessLog({
-        action: "settings_update",
-        details: `Auto-lock time changed to ${minutes} minutes`,
-        status: "success",
-      })
-    } catch (err) {
-      console.error("Error updating auto-lock time:", err)
-      setError("Failed to update auto-lock time")
-    }
-  }
-
-  const handleLockMachine = async () => {
-    try {
-      setError("")
-      const machineId = localStorage.getItem("machineId")
-      if (!machineId) throw new Error("Machine ID not found")
-
-      const machineRef = doc(db, "machines", machineId)
-      await updateDoc(machineRef, {
-        locked: true,
-        lockedAt: new Date().toISOString(),
-      })
-
-      // Log the action
-      await addAccessLog({
-        action: "machine_lock",
-        details: "Machine manually locked",
-        status: "success",
-      })
-
-      setShowLockDialog(false)
-      onLogout() // Redirect to login/PIN screen
-    } catch (err) {
-      console.error("Error locking machine:", err)
-      setError("Failed to lock machine")
+      setSettings((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: !value,
+        },
+      }))
+    } finally {
+      setSaving(false)
     }
   }
 
   const handleUnlinkMachine = async () => {
     try {
+      setSaving(true)
       setError("")
-      const machineId = localStorage.getItem("machineId")
-      if (!machineId) throw new Error("Machine ID not found")
+      setSuccess("")
 
       const machineRef = doc(db, "machines", machineId)
       await updateDoc(machineRef, {
-        linked: false,
-        unlinkedAt: new Date().toISOString(),
         linkedUsers: {},
+        unlinkedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
 
-      // Log the action
-      await addAccessLog({
-        action: "machine_unlink",
-        details: "Machine unlinked from web account",
-        status: "success",
+      await addAccessLog(
+        {
+          action: "machine_unlink",
+          details: "Machine unlinked from web account",
+          status: "success",
+        },
+        machineId,
+      )
+
+      setLinkStatus({
+        isLinked: false,
+        linkedUsers: null,
       })
 
-      localStorage.removeItem("machineId")
-      window.location.href = "/setup" // Redirect to setup page
+      setSuccess("Machine successfully unlinked")
+      setShowUnlinkDialog(false)
     } catch (err) {
       console.error("Error unlinking machine:", err)
       setError("Failed to unlink machine")
+    } finally {
+      setSaving(false)
     }
   }
 
   if (loading) {
-    return <div className="text-center py-8">Loading security settings...</div>
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
+              <Shield className="w-6 h-6" />
+              Security Settings
+            </h2>
+            <p className="text-gray-500">Configure machine security preferences</p>
+          </div>
+        </div>
+
+        {/* Settings Sections */}
+        <div className="grid gap-6">
+          {/* Auto-lock Section */}
+          <div className="bg-white rounded-xl border p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-[#0e5f97]" />
+              <h3 className="text-lg font-medium text-[#0e4772]">Auto-lock Settings</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="h-8 w-48 animate-shimmer rounded" />
+              <div className="h-10 w-full max-w-xs animate-shimmer rounded-lg" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-2">
-        <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
-          <Shield className="w-6 h-6" />
-          Security Settings
-        </h2>
-        <p className="text-gray-500">Manage your machine security preferences</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
+            <Shield className="w-6 h-6" />
+            Security Settings
+          </h2>
+          <p className="text-gray-500">Configure machine security preferences</p>
+        </div>
       </div>
 
       {/* Status Messages */}
       {(error || success) && (
         <div
           className={`px-4 py-3 rounded-lg border ${
-            error ? "bg-red-50 border-red-200 text-red-700" : "bg-green-50 border-green-200 text-green-600"
+            error ? "bg-red-50 border-red-200 text-red-700" : "bg-green-50 border-green-200 text-green-700"
           }`}
         >
           <div className="flex items-center gap-2">
-            {error ? <AlertCircle className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-            <p className="text-sm">{error || success}</p>
+            {error ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            <p className="text-sm font-medium">{error || success}</p>
+            <button
+              onClick={() => {
+                setError("")
+                setSuccess("")
+              }}
+              className="ml-auto hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Settings Groups */}
-      <div className="space-y-6">
-        {/* Auto-lock Settings Card */}
+      {/* Settings Sections */}
+      <div className="grid gap-6">
+        {/* Auto-lock Section */}
         <div className="bg-white rounded-xl border p-6 space-y-6">
           <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="text-lg font-medium text-[#0e4772] flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Auto-lock Settings
-              </h3>
-              <p className="text-sm text-gray-500">Configure automatic machine locking</p>
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-[#0e5f97]" />
+              <h3 className="text-lg font-medium text-[#0e4772]">Auto-logout Settings</h3>
             </div>
+            <button
+              onClick={() => handleLogout("manual_logout")}
+              className="px-4 py-2 text-sm font-medium text-[#0e5f97] border border-[#0e5f97] rounded-lg hover:bg-[#0e5f97]/5"
+            >
+              Logout Now
+            </button>
           </div>
-
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <label className="text-base font-medium text-gray-900">Auto-lock Machine</label>
-                <p className="text-sm text-gray-500">
-                  Automatically lock the machine after {autoLockTime} minutes of inactivity
-                </p>
+                <label className="text-base font-medium text-gray-900">Auto-logout</label>
+                <p className="text-sm text-gray-500">Automatically log out after period of inactivity</p>
               </div>
               <button
                 role="switch"
-                aria-checked={autoLockEnabled}
-                onClick={handleAutoLockToggle}
+                aria-checked={settings.autoLogout.enabled}
+                onClick={() => handleSettingChange("autoLogout", "enabled", !settings.autoLogout.enabled)}
+                disabled={saving}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${autoLockEnabled ? "bg-[#0e5f97]" : "bg-gray-200"}`}
+                  ${settings.autoLogout.enabled ? "bg-[#0e5f97]" : "bg-gray-200"}
+                  ${saving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                `}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                    ${autoLockEnabled ? "translate-x-6" : "translate-x-1"}`}
+                    ${settings.autoLogout.enabled ? "translate-x-6" : "translate-x-1"}`}
                 />
               </button>
             </div>
 
-            {autoLockEnabled && (
-              <div className="flex items-center gap-4 pl-4 border-l-2 border-[#0e5f97]/20">
-                <label className="text-sm text-gray-700">Lock after:</label>
+            {settings.autoLogout.enabled && (
+              <div className="pl-4 border-l-2 border-[#0e5f97]/20">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Logout after inactivity period</label>
                 <select
-                  value={autoLockTime}
-                  onChange={(e) => handleAutoLockTimeChange(Number(e.target.value))}
-                  className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e5f97]"
+                  value={settings.autoLogout.timeout}
+                  onChange={(e) => handleSettingChange("autoLogout", "timeout", Number(e.target.value))}
+                  disabled={saving}
+                  className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0e5f97]"
                 >
-                  <option value={5}>5 minutes</option>
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 hour</option>
+                  {AUTO_LOCK_TIMES.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
           </div>
         </div>
 
-        {/* PIN Settings Card */}
         <div className="bg-white rounded-xl border p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="text-lg font-medium text-[#0e4772] flex items-center gap-2">
-                <Key className="w-5 h-5" />
-                PIN Settings
-              </h3>
-              <p className="text-sm text-gray-500">Configure PIN security options</p>
-            </div>
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-[#0e5f97]" />
+            <h3 className="text-lg font-medium text-[#0e4772]">Machine Link Status</h3>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-base font-medium text-gray-900">Require PIN for Settings</label>
-              <p className="text-sm text-gray-500">Request PIN verification before changing sensitive settings</p>
+          {linkStatus.isLinked ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
+                <Shield className="w-4 h-4" />
+                <span className="text-sm font-medium">Machine Linked</span>
+              </div>
+
+              <div className="space-y-4">
+                {Object.entries(linkStatus.linkedUsers).map(([userId, userData]) => (
+                  <div key={userId} className="space-y-1">
+                    <p className="text-sm text-gray-500">Linked User</p>
+                    <p className="font-medium text-gray-900">{userData.name || "Unknown"}</p>
+                    <p className="text-sm text-gray-500">{userData.email || "No email provided"}</p>
+                    {userData.linkedAt && (
+                      <p className="text-sm text-gray-500">
+                        Linked on {new Date(userData.linkedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowUnlinkDialog(true)}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                <Unlink className="w-4 h-4" />
+                Unlink Machine
+              </button>
             </div>
-            <button
-              role="switch"
-              aria-checked={requirePinForSettings}
-              onClick={handlePinRequirementToggle}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                ${requirePinForSettings ? "bg-[#0e5f97]" : "bg-gray-200"}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                  ${requirePinForSettings ? "translate-x-6" : "translate-x-1"}`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <button
-            onClick={() => setShowLockDialog(true)}
-            className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg text-base font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-          >
-            <Lock className="w-5 h-5 mr-2" />
-            Lock Machine
-          </button>
-
-          <button
-            onClick={() => setShowUnlinkDialog(true)}
-            className="flex items-center justify-center px-4 py-3 border border-red-200 rounded-lg text-base font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-          >
-            <Unlink className="w-5 h-5 mr-2" />
-            Unlink Machine
-          </button>
-
-          <button
-            onClick={() => setShowLogoutDialog(true)}
-            className="flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-base font-medium col-span-full transition-colors"
-          >
-            <LogOut className="w-5 h-5 mr-2" />
-            Logout
-          </button>
+          ) : (
+            <div className="text-center py-6">
+              <Shield className="w-12 h-12 text-gray-300 mx-auto" />
+              <h4 className="text-gray-600 font-medium mb-2">Machine Not Linked</h4>
+              <p className="text-sm text-gray-500">
+                This machine is not currently linked to any web account. Use the QR code in the Machine Details tab to
+                link this machine.
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Lock Machine Dialog */}
-      {showLockDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Lock className="w-5 h-5" />
-              Lock Machine
-            </h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Are you sure you want to lock the machine? You will need to enter your PIN to unlock it.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowLockDialog(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLockMachine}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#0e5f97] rounded-lg hover:bg-[#0e4772]"
-              >
-                Lock Machine
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Unlink Machine Dialog */}
       {showUnlinkDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -366,55 +347,26 @@ export default function SecuritySettingsTab({ onLogout }) {
               <Unlink className="w-5 h-5" />
               Unlink Machine
             </h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Are you sure you want to unlink this machine from your web account? This will:
-            </p>
+            <p className="mt-2 text-sm text-gray-500">Are you sure you want to unlink this machine? This will:</p>
             <ul className="mt-2 space-y-1 text-sm text-gray-500 list-disc list-inside">
-              <li>Disconnect the machine from your web account</li>
-              <li>Stop syncing data to the web interface</li>
+              <li>Remove all web account connections</li>
               <li>Require re-linking via QR code to reconnect</li>
+              <li>Not affect local PIN access</li>
             </ul>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowUnlinkDialog(false)}
+                disabled={saving}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUnlinkMachine}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                Unlink Machine
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Logout Dialog */}
-      {showLogoutDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <LogOut className="w-5 h-5" />
-              Confirm Logout
-            </h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Are you sure you want to logout? You will need to enter your PIN to access the machine again.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowLogoutDialog(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onLogout}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-              >
-                Logout
+                {saving ? "Unlinking..." : "Unlink Machine"}
               </button>
             </div>
           </div>

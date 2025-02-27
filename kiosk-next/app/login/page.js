@@ -1,15 +1,15 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\login\page.js
+
 "use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-// import { updateDoc } from "firebase/firestore"
 import { addAccessLog } from "../utils/logging"
 import { MachineIdInput } from "./components/machineIdInput"
 import { PinEntry } from "./components/pinEntry"
 import { SavedMachineModal } from "./components/savedMachineModal"
-
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,7 +22,6 @@ export default function LoginPage() {
   const [success, setSuccess] = useState("")
 
   useEffect(() => {
-    // Check for saved machine ID on component mount
     const saved = localStorage.getItem("machineId")
     if (saved) {
       setSavedMachineId(saved)
@@ -100,73 +99,14 @@ export default function LoginPage() {
 
       await addAccessLog({
         action: "login",
-        machineId,
         status: "error",
         details: "Error during login",
         error: err.message,
-      })
+      }, machineId)
     } finally {
       setLoading(false)
     }
   }
-
-  // Helper function for successful login
-  // const handleSuccessfulLogin = async (machineRef) => {
-  //   await addAccessLog({
-  //     action: "login",
-  //     machineId,
-  //     status: "success",
-  //     details: "Login successful",
-  //   })
-
-  //   await updateDoc(machineRef, {
-  //     lastLoginAt: new Date().toISOString(),
-  //     failedAttempts: 0,
-  //     lockedUntil: null,
-  //   })
-
-  //   localStorage.setItem("machineId", machineId)
-  //   setSuccess("Login successful!")
-  //   setTimeout(() => router.push("/"), 1500)
-  // }
-
-  // Helper function for failed login
-  // const handleFailedLogin = async (newAttempts, machineRef) => {
-  //   if (newAttempts >= MAX_ATTEMPTS) {
-  //     const lockoutTime = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-  //     await updateDoc(machineRef, {
-  //       failedAttempts: newAttempts,
-  //       lockedUntil: lockoutTime.toISOString(),
-  //       lastFailedAttempt: new Date().toISOString(),
-  //     })
-
-  //     await addAccessLog({
-  //       action: "login",
-  //       machineId,
-  //       status: "locked",
-  //       details: "Account locked due to too many failed attempts",
-  //     })
-
-  //     setError("Too many failed attempts. Account locked for 15 minutes.")
-  //   } else {
-  //     await updateDoc(machineRef, {
-  //       failedAttempts: newAttempts,
-  //       lastFailedAttempt: new Date().toISOString(),
-  //     })
-
-  //     await addAccessLog({
-  //       action: "login",
-  //       machineId,
-  //       status: "failed",
-  //       details: `Failed login attempt (${newAttempts}/${MAX_ATTEMPTS})`,
-  //     })
-
-  //     setError(`Incorrect PIN. ${MAX_ATTEMPTS - newAttempts} attempts remaining.`)
-  //   }
-
-  //   setAttempts(newAttempts)
-  //   setPin("")
-  // }
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] p-4">
@@ -187,7 +127,7 @@ export default function LoginPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <MachineIdInput machineId={machineId} onMachineIdChange={setMachineId}/>
+          <MachineIdInput machineId={machineId} onMachineIdChange={setMachineId} />
 
           <PinEntry
             pin={pin}

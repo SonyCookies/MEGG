@@ -17,7 +17,6 @@ import {
   Clock,
   Info,
 } from "lucide-react"
-import { addAccessLog } from "../../utils/logging"
 
 // Enhanced color palette with gradients
 const COLORS = {
@@ -165,23 +164,10 @@ export default function DailySummaryTab() {
       console.log("Total logs fetched:", logs.length)
       setDefectLogs(logs)
 
-      // Log successful fetch
-      await addAccessLog({
-        action: "view_daily_summary",
-        status: "success",
-        details: `Fetched ${logs.length} records`,
-      })
     } catch (err) {
       console.error("Error fetching defect logs:", err)
       setError("Failed to load data. Please try again.")
 
-      // Log error
-      await addAccessLog({
-        action: "view_daily_summary",
-        status: "error",
-        details: "Failed to fetch daily summary",
-        error: err.message,
-      })
     } finally {
       setLoading(false)
     }
