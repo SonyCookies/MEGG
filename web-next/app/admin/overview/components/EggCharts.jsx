@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { EggDefectsChart } from "./ui/EggDefectsChart";
-import { EggSizesChart } from "../../dashboard/components/EggSizesChart";
+import { EggSizesChart } from "./ui/EggSizesChart";
 import { TotalEggDefectChart } from "./ui/TotalEggDefectChart";
-import { TotalEggsChart } from "../../dashboard/components/TotalEggsChart";
+import { TotalEggsChart } from "./ui/TotalEggsChart";
 import { Egg, Bug } from "lucide-react";
 import { EggSizeStats } from "./ui/EggSizeStats";
 import { EggDefectStats } from "./ui/EggDefectStats";
@@ -46,7 +46,7 @@ export default function EggCharts() {
       {/* Overview Card */}
       <div className="flex flex-1 flex-col gap-6 bg-white p-6 rounded-2xl border shadow">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
           {/* Dynamic Title */}
           <h3 className="text-xl font-medium">
             {activeTab === "sizing"
@@ -55,7 +55,7 @@ export default function EggCharts() {
           </h3>
 
           {/* Time Frame and Chart Type Selectors */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-start sm:items-center gap-4">
             <select
               className="w-full sm:w-auto rounded-full border border-primary/20 bg-white px-3 py-2 text-sm text-primary outline-none focus:ring-2 focus:ring-primary/20"
               value={timeFrame}

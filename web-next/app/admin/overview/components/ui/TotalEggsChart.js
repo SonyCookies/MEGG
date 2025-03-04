@@ -81,7 +81,7 @@ export function TotalEggsChart({ timeFrame }) {
     })
   }
 
-  // const padding = { left: 20, right: 20, top: 20, bottom: 30 }
+  const padding = { left: 20, right: 20, top: 20, bottom: 30 }
   const chartWidth = chartDimensions.width - padding.left - padding.right
   const chartHeight = chartDimensions.height - padding.top - padding.bottom
 

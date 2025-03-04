@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import { Ellipsis, Check, Trash } from "lucide-react";
+import { Ellipsis, Check, Trash, Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function Notifications() {
@@ -47,18 +47,21 @@ export default function Notifications() {
   const [activeAction, setActiveAction] = useState(null);
   const [showAll, setShowAll] = useState(false);
 
-  const router = useRouter()
+  const router = useRouter();
 
   const handleNotification = () => {
-    router.push('/admin/notifications')
-  }
+    router.push("/admin/notifications");
+  };
 
   return (
     <div className="w-80 xl:w-96 hidden xl:block">
       <div className="flex flex-col bg-white shadow border rounded-2xl overflow-hidden divide-y">
         {/* Header */}
         <div className="flex items-center justify-between p-6">
-          <h1 className="text-lg font-medium">Notifications</h1>
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            <h1 className="text-lg font-medium">Notifications</h1>
+          </div>
           {notifications.length > 5 && !showAll && (
             <div className="rounded-full w-8 h-8 flex items-center justify-center text-sm bg-blue-500 text-white">
               {notifications.length > 99 ? "+99" : notifications.length - 5}
@@ -75,7 +78,8 @@ export default function Notifications() {
               return (
                 <div key={notification.id} className="relative">
                   <div
-                    role="button" onClick={handleNotification}
+                    role="button"
+                    onClick={handleNotification}
                     className="bg-white transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full"
                   >
                     <div className="flex items-center gap-4">

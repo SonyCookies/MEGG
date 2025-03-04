@@ -90,6 +90,8 @@ export function Navbar({ mobileSidebarOpen, toggleMobileSidebar }) {
         return "Machines";
       case "/admin/notifications":
         return "Notifications";
+      case "/admin/history":
+        return "History";
       default:
         return "Overview";
     }
