@@ -168,7 +168,7 @@ export function EggSizesChart({ timeFrame }) {
     })
   }
 
-  // const padding = { left: 40, right: 40, top: 20, bottom: 30 }
+  const padding = { left: 40, right: 40, top: 20, bottom: 30 }
   const chartWidth = Math.min(
     chartDimensions.width - padding.left - padding.right,
     600

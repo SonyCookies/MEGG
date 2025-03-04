@@ -5,19 +5,19 @@ export function EggSizeStats() {
   return (
     <div className="flex flex-col md:flex-row gap-6">
       <div className="grid grid-cols-2 gap-6 w-full">
-        <div className="col-span-1 bg-blue-500 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
+        <div className="col-span-1 md:col-span-2 xl:col-span-1 bg-blue-500 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
           <h3 className="text-3xl font-semibold">100</h3>
           <span className="text-gray-50 text-sm">Total Eggs Sorted</span>
         </div>
-        <div className="col-span-1 bg-green-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
+        <div className="col-span-1 md:col-span-2 xl:col-span-1 bg-green-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
           <h3 className="text-3xl font-semibold">25</h3>
           <span className="text-gray-50 text-sm">Avg. Eggs /hr</span>
         </div>
-        <div className="col-span-1 bg-purple-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
+        <div className="col-span-1 md:col-span-2 xl:col-span-1 bg-purple-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
           <h3 className="text-3xl font-semibold">99.92%</h3>
           <span className="text-gray-50 text-sm">Sorting Accuracy</span>
         </div>
-        <div className="col-span-1 bg-yellow-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
+        <div className="col-span-1 md:col-span-2 xl:col-span-1 bg-yellow-400 text-white p-6 rounded-2xl shadow flex flex-col gap-4">
           <h3 className="text-3xl font-semibold">Large</h3>
           <span className="text-gray-50 text-sm">Most Common Size</span>
         </div>
@@ -29,7 +29,7 @@ export function EggSizeStats() {
           <h3 className="text-xl font-medium">Egg Size Distribution</h3>
         </div>
 
-        <div className="size-72">
+        <div className="size-72 mx-auto">
           <EggSizeDonutChart />
         </div>
 

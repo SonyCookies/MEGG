@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Settings, X, Package, Monitor } from "lucide-react";
+import {
+  LayoutDashboard,
+  Settings,
+  X,
+  Package,
+  Monitor,
+  History,
+} from "lucide-react";
 
 export function Sidebar({ mobileSidebarOpen, toggleMobileSidebar }) {
   const pathname = usePathname();
@@ -11,6 +18,7 @@ export function Sidebar({ mobileSidebarOpen, toggleMobileSidebar }) {
     { href: "/admin/overview", icon: LayoutDashboard, label: "Overview" },
     { href: "/admin/inventory", icon: Package, label: "Inventory" },
     { href: "/admin/machines", icon: Monitor, label: "Machines" },
+    { href: "/admin/history", icon: History, label: "History" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },
   ];
 

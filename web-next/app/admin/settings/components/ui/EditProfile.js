@@ -183,7 +183,7 @@ export default function EditProfile() {
 
   return (
     <>
-      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white border xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full">
+      <form className="border-l flex flex-1 flex-col gap-10 lg:gap-8 p-8 bg-white border s xl:bg-none rounded-2xl xl:rounded-none shadow xl:shadow-none w-full">
         {globalMessage && (
           <div
             className={`border-l-4 rounded-lg px-4 py-2 w-full  ${
@@ -204,7 +204,7 @@ export default function EditProfile() {
             </span>
           </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
+          <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-8">
             <div className="relative rounded-full w-28 h-28 border border-blue-500 overflow-hidden">
             <Image
                 src={profileImage === "/default.png" ? "/default.png" : profileImage}
@@ -214,7 +214,7 @@ export default function EditProfile() {
                 priority
               />
             </div>
-            <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <label className="cursor-pointer flex items-center gap-4 px-4 py-2 rounded-lg bg-blue-500 text-white transition-colors duration-150 hover:bg-blue-600">
                 <Upload className="w-5 h-5" /> Upload Image
                 <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />

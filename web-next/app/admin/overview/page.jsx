@@ -27,7 +27,7 @@ export default function OverviewPage() {
     <div className="min-h-screen bg-gray-300/10 flex flex-col gap-6 p-4 lg:p-6">
       <Navbar
         sidebarOpen={sidebarOpen}
-        mobileSidebarOpen={mobileSidebarOpen}
+        mobileSidebarOpen={mobileSidebarOpen} 
         toggleSidebar={toggleSidebar}
         toggleMobileSidebar={toggleMobileSidebar}
       />
