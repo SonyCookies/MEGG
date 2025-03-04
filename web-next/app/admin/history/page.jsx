@@ -53,6 +53,11 @@ export default function HistoryPage() {
                     Egg Defect
                   </button>
                 </div>
+
+                {/* main content */}
+                <div className="flex flex-col gap-6 bg-white border p-6 rounded-2xl shadow">
+                  asdsa
+                </div>
               </div>
 
               <Notifications />
