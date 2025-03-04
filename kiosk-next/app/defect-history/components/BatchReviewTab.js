@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { db } from "../../firebaseConfig"
 import { collection, query, orderBy, getDocs } from "firebase/firestore"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { Loader2, Package, AlertCircle, Timer } from "lucide-react"
+import { Loader2, Package, AlertCircle, Timer, RefreshCcw, Info } from "lucide-react"
 
 // Color palette
 const COLORS = {
@@ -234,62 +234,49 @@ export default function BatchReviewTab() {
   const [error, setError] = useState(null)
   const [defectLogs, setDefectLogs] = useState([])
   const [selectedBatch, setSelectedBatch] = useState(null)
-
-  // Fetch defect logs
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
-        const snapshot = await getDocs(q)
-        console.log(
-          "Raw Firestore data:",
-          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        )
-
-        const logs = snapshot.docs.map((doc) => {
-          const data = doc.data()
-          const rawTimestamp = data.timestamp
-          const parsedTimestamp = parseTimestamp(rawTimestamp)
-
-          console.log("Processing log:", {
-            id: doc.id,
-            rawTimestamp,
-            parsedTimestamp: parsedTimestamp.toLocaleString(),
-            batch: data.batch_number,
-          })
-
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: parsedTimestamp,
-          }
-        })
-
-        console.log("Processed logs:", logs)
-        setDefectLogs(logs)
-      } catch (err) {
-        console.error("Error fetching defect logs:", err)
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
+  const [chartType, setChartType] = useState("pie")
+  const [timePeriod, setTimePeriod] = useState("24h")
 
   // Process batch data
   const { batchStats, batchList } = useMemo(() => {
     if (!defectLogs.length) {
-      console.log("No defect logs available")
+      console.log("No defect logs available, defectLogs length:", defectLogs.length)
       return { batchStats: {}, batchList: [] }
     }
 
-    console.log("Processing all logs:", defectLogs.length)
+    // Filter logs based on selected time period
+    const now = new Date()
+    const periodInHours = Number.parseInt(timePeriod.replace(/[^0-9]/g, "")) * (timePeriod.includes("d") ? 24 : 1)
+    const periodStart = new Date(now.getTime() - periodInHours * 60 * 60 * 1000)
 
-    const stats = defectLogs.reduce((acc, log) => {
+    console.log("Time period filtering details:")
+    console.log("- Selected period:", timePeriod)
+    console.log("- Period in hours:", periodInHours)
+    console.log("- Current time:", now.toISOString())
+    console.log("- Period start:", periodStart.toISOString())
+
+    const filteredLogs = defectLogs.filter((log) => {
+      const logDate = new Date(log.timestamp)
+      console.log(`Comparing log:
+    - Log timestamp: ${log.timestamp}
+    - Parsed date: ${logDate.toISOString()}
+    - Include? ${logDate >= periodStart}`)
+      return true // Temporarily accept all logs to see the raw data
+    })
+
+    console.log(`Filtering results:
+  - Original logs: ${defectLogs.length}
+  - Filtered logs: ${filteredLogs.length}
+  - First log timestamp: ${filteredLogs[0]?.timestamp}
+  - Last log timestamp: ${filteredLogs[filteredLogs.length - 1]?.timestamp}`)
+
+    const stats = filteredLogs.reduce((acc, log) => {
       const batch = log.batch_number
+      if (!batch) {
+        console.warn("Log missing batch_number:", log)
+        return acc
+      }
+
       if (!acc[batch]) {
         acc[batch] = {
           defects: [],
@@ -303,24 +290,34 @@ export default function BatchReviewTab() {
       acc[batch].byType[log.defect_type] = (acc[batch].byType[log.defect_type] || 0) + 1
 
       // Update start and end times
-      if (log.timestamp < acc[batch].startTime) acc[batch].startTime = log.timestamp
-      if (log.timestamp > acc[batch].endTime) acc[batch].endTime = log.timestamp
+      const logTime = new Date(log.timestamp).getTime()
+      const startTime = new Date(acc[batch].startTime).getTime()
+      const endTime = new Date(acc[batch].endTime).getTime()
+
+      if (logTime < startTime) {
+        acc[batch].startTime = log.timestamp
+      }
+      if (logTime > endTime) {
+        acc[batch].endTime = log.timestamp
+      }
 
       return acc
     }, {})
 
-    // Sort defect types by count for each batch
-    Object.keys(stats).forEach((batch) => {
-      stats[batch].byType = Object.entries(stats[batch].byType)
-        .sort(([, a], [, b]) => b - a)
-        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {})
+    console.log("Processed batch stats:", stats)
+
+    // Sort batch list by most recent first
+    const sortedBatches = Object.keys(stats).sort((a, b) => {
+      return new Date(stats[b].endTime).getTime() - new Date(stats[a].endTime).getTime()
     })
+
+    console.log("Sorted batches:", sortedBatches)
 
     return {
       batchStats: stats,
-      batchList: Object.keys(stats).sort((a, b) => stats[b].startTime.getTime() - stats[a].startTime.getTime()),
+      batchList: sortedBatches,
     }
-  }, [defectLogs])
+  }, [defectLogs, timePeriod])
 
   // Selected batch details
   const selectedBatchDetails = useMemo(() => {
@@ -346,8 +343,69 @@ export default function BatchReviewTab() {
     }
   }, [selectedBatch, batchStats])
 
+  // Fetch defect logs
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
+      const snapshot = await getDocs(q)
+
+      console.log("Fetched documents:", snapshot.size)
+
+      const logs = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        console.log("Document data:", data)
+
+        // Handle different timestamp formats
+        let timestamp = data.timestamp
+        if (timestamp?.toDate) {
+          // Firestore Timestamp
+          timestamp = timestamp.toDate()
+        } else if (typeof timestamp === "string") {
+          // ISO string
+          timestamp = new Date(timestamp)
+        } else if (typeof timestamp === "number") {
+          // Unix timestamp
+          timestamp = new Date(timestamp)
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: timestamp,
+          batch_number: data.batch_number || data.batchNumber || "UNKNOWN", // Handle different field names
+        }
+      })
+
+      console.log("Processed logs:", logs)
+      setDefectLogs(logs)
+    } catch (err) {
+      console.error("Error fetching defect logs:", err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Initial fetch
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   if (error) {
-    return <div className="text-red-500 text-center p-4">Error loading batch review: {error}</div>
+    return (
+      <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          <div>
+            <p className="font-medium">Error loading batch review</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -359,28 +417,46 @@ export default function BatchReviewTab() {
   }
 
   if (!batchList.length) {
-    return <div className="text-gray-500 text-center p-4">No batch data available</div>
+    return (
+      <div className="text-center py-12">
+        <Package className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-medium text-gray-900">No batch data available</h3>
+        <p className="mt-1 text-sm text-gray-500">Start inspecting items to see batch statistics</p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
+            <Package className="w-6 h-6" />
+            Batch Review
+          </h2>
+          <p className="text-gray-500">Analyze defects by production batch</p>
+        </div>
+        <button onClick={fetchData} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Refresh data">
+          <RefreshCcw className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Controls */}
+
       {/* Batch Summary Cards */}
       <div>
         <h3 className="text-lg font-semibold mb-4 text-[#0e4772]">All Batches</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {batchList.length > 0 ? (
-            batchList.map((batch) => (
-              <BatchSummaryCard
-                key={batch}
-                batch={batch}
-                stats={batchStats[batch]}
-                onClick={() => setSelectedBatch(selectedBatch === batch ? null : batch)}
-                isSelected={selectedBatch === batch}
-              />
-            ))
-          ) : (
-            <div className="col-span-full text-center py-8 text-gray-500">No batches found</div>
-          )}
+          {batchList.map((batch) => (
+            <BatchSummaryCard
+              key={batch}
+              batch={batch}
+              stats={batchStats[batch]}
+              onClick={() => setSelectedBatch(selectedBatch === batch ? null : batch)}
+              isSelected={selectedBatch === batch}
+            />
+          ))}
         </div>
       </div>
 
@@ -433,27 +509,53 @@ export default function BatchReviewTab() {
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Defect Distribution */}
-            <div className="bg-white rounded-xl border p-6">
-              <h4 className="text-lg font-semibold mb-6 text-[#0e4772]">Defect Distribution</h4>
+            <div className="bg-white rounded-xl border p-6 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-[#0e4772]">Defect Distribution</h3>
+                  <p className="text-sm text-gray-500">Breakdown of defect types</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Info className="w-4 h-4" />
+                  Last updated: {new Date().toLocaleTimeString()}
+                </div>
+              </div>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
+                  {chartType === "pie" ? (
+                    <PieChart>
+                      <Pie
+                        data={selectedBatchDetails.chartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={2}
+                      >
+                        {selectedBatchDetails.chartData.map((entry) => (
+                          <Cell key={entry.name} fill={getDefectColor(entry.name).base} stroke="#fff" strokeWidth={2} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  ) : (
+                    <BarChart
                       data={selectedBatchDetails.chartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={2}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                     >
-                      {selectedBatchDetails.chartData.map((entry) => (
-                        <Cell key={entry.name} fill={getDefectColor(entry.name).base} stroke="#fff" strokeWidth={2} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} tick={{ fill: "#0e4772" }} />
+                      <YAxis tick={{ fill: "#0e4772" }} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="value" fill={getDefectColor("default").base} radius={[4, 4, 0, 0]}>
+                        {selectedBatchDetails.chartData.map((entry) => (
+                          <Cell key={entry.name} fill={getDefectColor(entry.name).base} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
                 </ResponsiveContainer>
               </div>
             </div>
