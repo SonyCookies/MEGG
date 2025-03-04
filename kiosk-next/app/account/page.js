@@ -1,45 +1,79 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, KeyRound, QrCode, History, Settings } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useInternetConnection } from "../contexts/InternetConnectionContext"
-import { useWebSocket } from "../contexts/WebSocketContext"
+import { ArrowLeft, KeyRound, QrCode, History, Settings } from "lucide-react"
 import { ConnectionStatus } from "../components/ConnectionStatus"
-import PinAuthTab from "./components/PinAuthTab"
 import MachineDetailsTab from "./components/MachineDetailsTab"
+import PinAuthTab from "./components/PinAuthTab"
 import AccessLogsTab from "./components/AccessLogsTab"
 import SecuritySettingsTab from "./components/SecuritySettingsTab"
-import { PinAuthModal } from "./components/PinAuthModal"
+
+const tabs = [
+  { id: "machine", label: "Machine Details", icon: QrCode },
+  { id: "security", label: "PIN Authentication", icon: KeyRound },
+  { id: "logs", label: "Access Logs", icon: History },
+  { id: "settings", label: "Security Settings", icon: Settings },
+]
 
 export default function Account() {
   const router = useRouter()
-  const isOnline = useInternetConnection()
-  const { readyState } = useWebSocket()
   const [activeTab, setActiveTab] = useState("machine")
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [showPinModal, setShowPinModal] = useState(true)
+  const [machineId, setMachineId] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [isOnline, setIsOnline] = useState(true)
+  const [readyState, setReadyState] = useState(1)
 
-  // Tabs configuration
-  const tabs = [
-    { id: "machine", label: "Machine Details", icon: QrCode },
-    { id: "security", label: "Security", icon: KeyRound },
-    { id: "logs", label: "Access Logs", icon: History },
-    { id: "settings", label: "Settings", icon: Settings },
-  ]
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
 
-  // Handle successful PIN authentication
-  const handleAuthSuccess = () => {
-    setIsAuthenticated(true)
-    setShowPinModal(false)
-  }
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
 
-  // Handle logout
-  const handleLogout = () => {
-    setIsAuthenticated(false)
-    setShowPinModal(true)
-    router.push("/login")
+    const checkAuth = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch("/api/auth/session")
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Session invalid")
+        }
+
+        console.log("Session data:", data)
+        setMachineId(data.machineId)
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.push("/login")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [router])
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        throw new Error("Logout failed")
+      }
+
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
   }
 
   return (
@@ -75,16 +109,14 @@ export default function Account() {
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-6">
-              {activeTab === "machine" && <MachineDetailsTab />}
-              {activeTab === "security" && <PinAuthTab />}
-              {activeTab === "logs" && <AccessLogsTab />}
-              {activeTab === "settings" && <SecuritySettingsTab onLogout={handleLogout} />}
+              {activeTab === "machine" && <MachineDetailsTab machineId={machineId} />}
+              {activeTab === "security" && <PinAuthTab machineId={machineId} />}
+              {activeTab === "logs" && <AccessLogsTab machineId={machineId} />}
+              {activeTab === "settings" && <SecuritySettingsTab machineId={machineId} onLogout={handleLogout} />}
             </div>
           </div>
         </div>
       </div>
-
-      {showPinModal && <PinAuthModal onClose={() => {}} onSuccess={handleAuthSuccess} canClose={false} />}
     </div>
   )
 }
