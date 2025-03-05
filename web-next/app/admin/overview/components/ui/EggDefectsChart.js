@@ -1,138 +1,91 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { getDailyDefectData, getMonthlyDefectData } from "../../../../lib/api"
 
 export function EggDefectsChart({ timeFrame }) {
   const [hoverData, setHoverData] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const chartRef = useRef(null)
   const [chartDimensions, setChartDimensions] = useState({
     width: 0,
     height: 0,
   })
 
-  const dailyData = [
-    {
-      day: "Mon",
-      cracks: 300,
-      dirt: 188,
-      deformities: 150,
-      bloodSpots: 75,
-      other: 37,
-    },
-    {
-      day: "Tue",
-      cracks: 312,
-      dirt: 195,
-      deformities: 156,
-      bloodSpots: 78,
-      other: 39,
-    },
-    {
-      day: "Wed",
-      cracks: 288,
-      dirt: 180,
-      deformities: 144,
-      bloodSpots: 72,
-      other: 36,
-    },
-    {
-      day: "Thu",
-      cracks: 330,
-      dirt: 206,
-      deformities: 165,
-      bloodSpots: 83,
-      other: 41,
-    },
-    {
-      day: "Fri",
-      cracks: 306,
-      dirt: 191,
-      deformities: 153,
-      bloodSpots: 77,
-      other: 38,
-    },
-    {
-      day: "Sat",
-      cracks: 282,
-      dirt: 176,
-      deformities: 141,
-      bloodSpots: 71,
-      other: 35,
-    },
-    {
-      day: "Sun",
-      cracks: 270,
-      dirt: 169,
-      deformities: 135,
-      bloodSpots: 68,
-      other: 33,
-    },
-  ]
-
-  const monthlyData = [
-    {
-      month: "Jan",
-      cracks: 9000,
-      dirt: 5625,
-      deformities: 4500,
-      bloodSpots: 2250,
-      other: 1125,
-    },
-    {
-      month: "Feb",
-      cracks: 8400,
-      dirt: 5250,
-      deformities: 4200,
-      bloodSpots: 2100,
-      other: 1050,
-    },
-    {
-      month: "Mar",
-      cracks: 9600,
-      dirt: 6000,
-      deformities: 4800,
-      bloodSpots: 2400,
-      other: 1200,
-    },
-    {
-      month: "Apr",
-      cracks: 9300,
-      dirt: 5813,
-      deformities: 4650,
-      bloodSpots: 2325,
-      other: 1162,
-    },
-    {
-      month: "May",
-      cracks: 10200,
-      dirt: 6375,
-      deformities: 5100,
-      bloodSpots: 2550,
-      other: 1275,
-    },
-    {
-      month: "Jun",
-      cracks: 9900,
-      dirt: 6188,
-      deformities: 4950,
-      bloodSpots: 2475,
-      other: 1237,
-    },
-  ]
-
-  const data = timeFrame === "daily" ? dailyData : monthlyData
-  const maxDefects = Math.max(...data.map((d) => d.cracks + d.dirt + d.deformities + d.bloodSpots + d.other))
-
   const colors = {
     cracks: "#0e5f97",
-    dirt: "#0e4772",
-    deformities: "#b0b0b0",
+    good: "#CC5500",
+    dirty: "#b0b0b0",
     bloodSpots: "#fb510f",
     other: "#ecb662",
   }
 
-  const defectTypes = ["other", "bloodSpots", "deformities", "dirt", "cracks"]
+  const defectTypes = ["other", "bloodSpots", "dirty", "good", "cracks"]
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setIsVisible(false)
+
+        let fetchedData = []
+
+        try {
+          fetchedData = timeFrame === "daily" ? await getDailyDefectData() : await getMonthlyDefectData()
+        } catch (err) {
+          console.error("Error fetching data:", err)
+          // Provide fallback data if API fails
+          fetchedData =
+            timeFrame === "daily"
+              ? [
+                  { day: "Mon", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Tue", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Wed", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Thu", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Fri", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Sat", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { day: "Sun", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                ]
+              : [
+                  { month: "Jan", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { month: "Feb", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { month: "Mar", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { month: "Apr", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { month: "May", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                  { month: "Jun", cracks: 0, good: 0, dirty: 0, bloodSpots: 0, other: 0 },
+                ]
+        }
+
+        // Validate data to ensure all properties exist and are numbers
+        const validatedData = fetchedData.map((item) => {
+          const validItem = {
+            ...(timeFrame === "daily" ? { day: item.day || "" } : { month: item.month || "" }),
+            cracks: Number(item.cracks) || 0,
+            good: Number(item.good) || 0,
+            dirty: Number(item.dirty) || 0,
+            bloodSpots: Number(item.bloodSpots) || 0,
+            other: Number(item.other) || 0,
+          }
+          return validItem
+        })
+
+        setData(validatedData)
+        setLoading(false)
+
+        // Small delay before animation starts
+        setTimeout(() => setIsVisible(true), 100)
+      } catch (err) {
+        console.error("Error in fetchData:", err)
+        setError("Failed to load defect data")
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [timeFrame])
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -142,18 +95,28 @@ export function EggDefectsChart({ timeFrame }) {
       }
     }
 
+    // Initial update
     updateDimensions()
+
+    // Update on resize
     window.addEventListener("resize", updateDimensions)
 
-    const timer = setTimeout(() => setIsVisible(true), 100)
+    // Force multiple updates to ensure dimensions are captured correctly
+    const timer1 = setTimeout(updateDimensions, 100)
+    const timer2 = setTimeout(updateDimensions, 500)
+    const timer3 = setTimeout(updateDimensions, 1000)
 
     return () => {
       window.removeEventListener("resize", updateDimensions)
-      clearTimeout(timer)
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
     }
   }, [])
 
   const handleMouseMove = (event, d) => {
+    if (!chartRef.current) return
+
     const svgRect = chartRef.current.getBoundingClientRect()
     const x = event.clientX - svgRect.left
     const y = event.clientY - svgRect.top
@@ -166,10 +129,15 @@ export function EggDefectsChart({ timeFrame }) {
     })
   }
 
+  // Fixed padding values
   const padding = { left: 40, right: 40, top: 20, bottom: 30 }
-  const chartWidth = Math.min(chartDimensions.width - padding.left - padding.right, 600)
-  const chartHeight = chartDimensions.height - padding.top - padding.bottom
-  const barWidth = Math.min((chartWidth / data.length) * 0.6, 40)
+
+  // Calculate chart dimensions properly
+  const chartWidth = chartDimensions.width > 0 ? chartDimensions.width - padding.left - padding.right : 500
+  const chartHeight = chartDimensions.height > 0 ? chartDimensions.height - padding.top - padding.bottom : 250
+
+  // Calculate bar width based on available space
+  const barWidth = data.length > 0 ? Math.min((chartWidth / data.length) * 0.6, 40) : 30
 
   const getTooltipPosition = (x, y) => {
     const tooltipWidth = 150
@@ -192,16 +160,72 @@ export function EggDefectsChart({ timeFrame }) {
     return { left, top }
   }
 
+  if (loading) {
+    return (
+      <div className="relative w-full h-[300px] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="relative w-full h-[300px] flex items-center justify-center">
+        <div className="text-red-500">{error}</div>
+      </div>
+    )
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="relative w-full h-[300px] flex items-center justify-center">
+        <div className="text-gray-500">No data available</div>
+      </div>
+    )
+  }
+
+  // Calculate the maximum value for scaling
+  const maxDefects = Math.max(
+    1, // Prevent division by zero
+    ...data.map(
+      (item) =>
+        (Number(item.cracks) || 0) +
+        (Number(item.good) || 0) +
+        (Number(item.dirty) || 0) +
+        (Number(item.bloodSpots) || 0) +
+        (Number(item.other) || 0),
+    ),
+  )
+
   return (
     <div className="relative w-full h-[300px]" ref={chartRef}>
       <svg
         className="w-full h-full"
-        viewBox={`0 0 ${chartDimensions.width} ${chartDimensions.height}`}
+        viewBox={`0 0 ${chartDimensions.width || 600} ${chartDimensions.height || 300}`}
         preserveAspectRatio="xMidYMid meet"
       >
+        {/* Y-axis labels */}
+        <g transform={`translate(${padding.left - 5}, ${padding.top})`}>
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <text
+              key={ratio}
+              x={0}
+              y={chartHeight * (1 - ratio)}
+              textAnchor="end"
+              dominantBaseline="middle"
+              className="text-xs fill-current text-gray-500"
+            >
+              {Math.round(maxDefects * ratio)}
+            </text>
+          ))}
+        </g>
+
+        {/* Bars */}
         <g transform={`translate(${padding.left}, ${padding.top})`}>
           {data.map((d, i) => {
-            const x = (i / (data.length - 1)) * (chartWidth - barWidth)
+            // Calculate bar position
+            const barSpacing = chartWidth / (data.length || 1)
+            const x = i * barSpacing + (barSpacing - barWidth) / 2
             let accumulatedHeight = 0
 
             return (
@@ -212,17 +236,25 @@ export function EggDefectsChart({ timeFrame }) {
                 onMouseLeave={() => setHoverData(null)}
               >
                 {defectTypes.map((defectType, defectIndex) => {
-                  const height = (d[defectType] / maxDefects) * chartHeight
+                  // Ensure the value is a number with a fallback to 0
+                  const value = Number(d[defectType]) || 0
+
+                  // Calculate height with safety checks
+                  const height = (value / maxDefects) * chartHeight
+
+                  // Calculate y position
                   const y = chartHeight - accumulatedHeight - height
+
+                  // Update accumulated height
                   accumulatedHeight += height
 
                   return (
                     <rect
                       key={`${defectType}-${i}`}
                       x={x}
-                      y={y - 0.5}
+                      y={y}
                       width={barWidth}
-                      height={height + 1}
+                      height={Math.max(0, height)}
                       fill={colors[defectType]}
                       className="transition-all ease-in-out"
                       style={{
@@ -253,6 +285,8 @@ export function EggDefectsChart({ timeFrame }) {
           })}
         </g>
       </svg>
+
+      {/* Tooltip */}
       {hoverData && (
         <div
           className="absolute bg-white p-3 rounded-xl shadow-lg text-sm border border-gray-200 transition-all duration-300 ease-in-out"
