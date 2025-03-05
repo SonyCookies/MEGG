@@ -15,7 +15,7 @@ import {
   RefreshCcw,
   ChevronDown,
 } from "lucide-react"
-import { collection, query, orderBy, limit, startAfter, getDocs, getCountFromServer } from "firebase/firestore"
+import { collection, query, where, orderBy, limit, startAfter, getDocs, getCountFromServer } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
 // import { addAccessLog } from "../../utils/logging"
 
@@ -96,15 +96,23 @@ export default function LogsTab() {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await fetch("/api/auth/session")
-        if (!response.ok) {
-          throw new Error("Failed to fetch session")
+        // First verify session
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
         }
-        const data = await response.json()
-        setMachineId(data.machineId)
+
+        if (!sessionData.machineId) {
+          throw new Error("Machine ID not found in session")
+        }
+
+        setMachineId(sessionData.machineId)
+        console.log("Machine ID set:", sessionData.machineId)
       } catch (err) {
         console.error("Error fetching session:", err)
-        setError("Failed to authenticate session")
+        setError("Failed to authenticate session: " + err.message)
       }
     }
 
@@ -114,12 +122,18 @@ export default function LogsTab() {
   // Fetch total count
   useEffect(() => {
     const fetchTotalCount = async () => {
+      if (!machineId) return
+
       try {
         const logsRef = collection(db, "defect_logs")
-        const snapshot = await getCountFromServer(logsRef)
+        // Add where clause to filter by machine_id
+        const q = query(logsRef, where("machine_id", "==", machineId))
+        const snapshot = await getCountFromServer(q)
         setTotalItems(snapshot.data().count)
+        console.log(`Found ${snapshot.data().count} logs for machine ${machineId}`)
       } catch (err) {
         console.error("Error fetching total count:", err)
+        setError("Failed to count logs: " + err.message)
       }
     }
 
@@ -139,13 +153,21 @@ export default function LogsTab() {
       try {
         setLoading(true)
         setError(null)
-        console.log("Fetching logs for page:", pageNumber)
+        console.log("Fetching logs for page:", pageNumber, "for machine:", machineId)
 
         const logsRef = collection(db, "defect_logs")
-        let q = query(logsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
+        let q
 
         if (lastDoc && pageNumber > 1) {
-          q = query(logsRef, orderBy("timestamp", "desc"), startAfter(lastDoc), limit(ITEMS_PER_PAGE))
+          q = query(
+            logsRef,
+            where("machine_id", "==", machineId),
+            orderBy("timestamp", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE),
+          )
+        } else {
+          q = query(logsRef, where("machine_id", "==", machineId), orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
         }
 
         const querySnapshot = await getDocs(q)
@@ -162,6 +184,7 @@ export default function LogsTab() {
         setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE)
 
         setLogs(fetchedLogs)
+        console.log(`Fetched ${fetchedLogs.length} logs for machine ${machineId}`)
 
         // Log successful fetch
         // await addAccessLog(
@@ -176,7 +199,7 @@ export default function LogsTab() {
         setSuccess("Logs loaded successfully")
       } catch (err) {
         console.error("Error fetching logs:", err)
-        setError("Failed to load logs. Please try again later.")
+        setError("Failed to load logs: " + err.message)
 
         // Log error
         // await addAccessLog(

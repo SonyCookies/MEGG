@@ -1,8 +1,10 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\defect-history\components\ImagesTab.js
+
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { db, storage } from "../../firebaseConfig"
-import { collection, query, orderBy, limit, startAfter, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, limit, startAfter, getDocs, where } from "firebase/firestore"
 import { ref, getDownloadURL } from "firebase/storage"
 import {
   Loader2,
@@ -126,6 +128,34 @@ export default function ImagesTab() {
     batchNumber: "",
     sortBy: "newest",
   })
+  const [machineId, setMachineId] = useState(null)
+
+  // Fetch machine ID from session
+  useEffect(() => {
+    const fetchMachineId = async () => {
+      try {
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
+        }
+
+        if (!sessionData.machineId) {
+          console.warn("Machine ID not found in session, using fallback")
+          setMachineId("unknown_machine")
+        } else {
+          console.log(`Machine ID fetched: ${sessionData.machineId}`)
+          setMachineId(sessionData.machineId)
+        }
+      } catch (error) {
+        console.error(`Error fetching machine ID: ${error.message}`)
+        setMachineId("unknown_machine")
+      }
+    }
+
+    fetchMachineId()
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -183,32 +213,55 @@ export default function ImagesTab() {
   const fetchImages = useCallback(
     async (lastDoc = null) => {
       try {
+        if (!machineId) {
+          console.log("Machine ID not available yet, waiting...")
+          return []
+        }
+
+        console.log(`Fetching images for machine ID: ${machineId}`)
         const imagesRef = collection(db, "defect_logs")
-        let q = query(imagesRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
+
+        // Add machine_id filter to the query
+        let q = query(
+          imagesRef,
+          where("machine_id", "==", machineId),
+          orderBy("timestamp", "desc"),
+          limit(ITEMS_PER_PAGE),
+        )
 
         if (lastDoc) {
-          q = query(imagesRef, orderBy("timestamp", "desc"), startAfter(lastDoc), limit(ITEMS_PER_PAGE))
+          q = query(
+            imagesRef,
+            where("machine_id", "==", machineId),
+            orderBy("timestamp", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE),
+          )
         }
 
         const snapshot = await getDocs(q)
+        console.log(`Found ${snapshot.docs.length} images for machine ${machineId}`)
         const processedImages = await processImages(snapshot.docs)
 
         if (isMounted.current) {
-          setLastVisible(snapshot.docs[snapshot.docs.length - 1])
+          setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null)
           setHasMore(snapshot.docs.length === ITEMS_PER_PAGE)
         }
 
         return processedImages
       } catch (error) {
+        console.error("Error fetching images:", error)
         throw new Error("Failed to fetch images")
       }
     },
-    [processImages],
+    [processImages, machineId],
   )
 
-  // Initial load
+  // Initial load - triggered when machineId changes
   useEffect(() => {
     const loadInitialData = async () => {
+      if (!machineId) return // Wait until machineId is available
+
       try {
         setLoading(true)
         setError(null)
@@ -229,11 +282,11 @@ export default function ImagesTab() {
     }
 
     loadInitialData()
-  }, [fetchImages])
+  }, [fetchImages, machineId])
 
   // Load more
   const handleLoadMore = async () => {
-    if (!hasMore || loadingMore) return
+    if (!hasMore || loadingMore || !machineId) return
 
     try {
       setLoadingMore(true)
@@ -297,7 +350,7 @@ export default function ImagesTab() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `defect-images-${new Date().toISOString()}.csv`
+    link.download = `defect-images-${machineId}-${new Date().toISOString()}.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -326,7 +379,7 @@ export default function ImagesTab() {
           <ImageIcon className="w-6 h-6" />
           Image Gallery
         </h2>
-        <p className="text-gray-500">View and analyze defect detection images</p>
+        <p className="text-gray-500">View and analyze defect detection images for machine {machineId}</p>
       </div>
 
       {/* Search and Filters */}
