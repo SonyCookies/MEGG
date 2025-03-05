@@ -117,7 +117,8 @@ export default function NotificationMobile({
                   return (
                     <div key={notification.id} className="relative">
                       <div
-                        role="button" onClick={handleNotification}
+                        role="button"
+                        onClick={handleNotification}
                         className="bg-white transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full"
                       >
                         <div className="flex items-center gap-4">
