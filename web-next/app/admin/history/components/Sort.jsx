@@ -3,19 +3,19 @@
 import { useState, useRef, useEffect } from "react";
 import { BarChart2, Calendar, Layers, List, ChevronDown } from "lucide-react";
 
-import BatchReview from "./ui/defect/BatchReview";
-import DailySummary from "./ui/defect/DailySummary";
-import DefectLog from "./ui/defect/DefectLog";
-import Statistics from "./ui/defect/Statistics";
+import BatchReview from "./ui/sort/BatchReview";
+import DailySummary from "./ui/sort/DailySummary";
+import SortLog from "./ui/sort/SortLog";
+import Statistics from "./ui/sort/Statistics";
 
 export default function Sort() {
-  const [selectedTab, setSelectedTab] = useState("defectLog");
+  const [selectedTab, setSelectedTab] = useState("sortLog");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   // Tab options for the dropdown
   const tabOptions = [
-    { name: "Defect Log", value: "defectLog", icon: List },
+    { name: "Sort Log", value: "sortLog", icon: List },
     { name: "Statistics", value: "statistics", icon: BarChart2 },
     { name: "Daily Summary", value: "dailySummary", icon: Calendar },
     { name: "Batch Review", value: "batchReview", icon: Layers },
@@ -45,7 +45,6 @@ export default function Sort() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      SORT
       <div className="flex flex-col gap-4">
         {/* Mobile Dropdown */}
         <div
@@ -104,14 +103,14 @@ export default function Sort() {
         <div className="hidden md:flex text-sm gap-4 justify-center p-6 border shadow rounded-2xl bg-white">
           <button
             className={`px-4 py-3 flex items-center gap-2 rounded-lg border transition-colors duration-150 ${
-              selectedTab === "defectLog"
+              selectedTab === "sortLog"
                 ? "text-white bg-blue-500 border-blue-500 hover:bg-blue-600 hover:border-blue-600"
                 : "hover:bg-gray-300/20 text-gray-500"
             }`}
-            onClick={() => setSelectedTab("defectLog")}
+            onClick={() => setSelectedTab("sortLog")}
           >
             <List className="w-5 h-5" />
-            Defect Log
+            Sort Log
           </button>
           <button
             className={`px-4 py-3 flex items-center gap-2 rounded-lg border transition-colors duration-150 ${
@@ -150,7 +149,7 @@ export default function Sort() {
 
         {/* main content - conditional rendering based on selected tab */}
         <div className="border shadow rounded-2xl bg-white">
-          {selectedTab === "defectLog" && <DefectLog />}
+          {selectedTab === "sortLog" && <SortLog />}
           {selectedTab === "statistics" && <Statistics />}
           {selectedTab === "dailySummary" && <DailySummary />}
           {selectedTab === "batchReview" && <BatchReview />}

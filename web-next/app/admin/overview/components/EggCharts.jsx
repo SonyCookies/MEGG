@@ -19,7 +19,7 @@ export default function EggCharts() {
       {/* Toggle Buttons */}
       <div className="flex items-center justify-center gap-4">
         <button
-          className={`rounded-2xl border px-8 py-4 flex items-center gap-4 transition-colors duration-150 ${
+          className={`rounded-2xl border px-8 py-4 flex items-center gap-2 transition-colors duration-150 ${
             activeTab === "sizing"
               ? "bg-blue-500 text-white hover:bg-blue-600"
               : "bg-white hover:bg-gray-200"
@@ -31,7 +31,7 @@ export default function EggCharts() {
         </button>
 
         <button
-          className={`rounded-2xl border px-8 py-4 flex items-center gap-4 transition-colors duration-150 ${
+          className={`rounded-2xl border px-8 py-4 flex items-center gap-2 transition-colors duration-150 ${
             activeTab === "defects"
               ? "bg-blue-500 text-white hover:bg-blue-600"
               : "bg-white hover:bg-gray-200"
