@@ -1,184 +1,224 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Package, Plus, Minus, ChevronDown, ChevronUp, Search } from 'lucide-react'
-import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { ArrowLeft, RefreshCcw, LayoutDashboard, Package } from "lucide-react"
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
+import { db } from "../firebaseConfig"
 
-export default function Inventory() {
+// Components
+import BatchSelector from "./components/BatchSelector"
+import BatchSummaryTab from "./components/BatchSummaryTab"
+import InventoryTab from "./components/InventoryTab"
+
+export default function InventoryPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const action = searchParams.get("action")
-  const [batchNumber, setBatchNumber] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isNewBatchFormOpen, setIsNewBatchFormOpen] = useState(false)
-  const [eggCounts, setEggCounts] = useState({
-    small: 0,
-    medium: 0,
-    large: 0,
-    xl: 0,
-    jumbo: 0,
-  })
+  const [machineId, setMachineId] = useState(null)
+  const [batches, setBatches] = useState([])
+  const [selectedBatch, setSelectedBatch] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState("summary") // "summary" or "inventory"
+  const [recentUpdates, setRecentUpdates] = useState([])
 
-  // Mock data for existing batches
-  const [batches, setBatches] = useState([
-    { id: 1, batchNumber: "B001", date: "2023-06-20", status: "In Progress", totalEggs: 500 },
-    { id: 2, batchNumber: "B002", date: "2023-06-19", status: "Completed", totalEggs: 750 },
-    { id: 3, batchNumber: "B003", date: "2023-06-18", status: "Completed", totalEggs: 600 },
-    { id: 4, batchNumber: "B004", date: "2023-06-17", status: "Completed", totalEggs: 800 },
-    { id: 5, batchNumber: "B005", date: "2023-06-16", status: "Completed", totalEggs: 550 },
-    { id: 6, batchNumber: "B006", date: "2023-06-15", status: "Completed", totalEggs: 700 },
-  ])
-
-  const handleCountChange = (size, change) => {
-    setEggCounts((prev) => ({
-      ...prev,
-      [size]: Math.max(0, prev[size] + change),
-    }))
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    // Here you would typically send this data to your backend
-    console.log("Submitting inventory:", { batchNumber, eggCounts })
-    // After submission, you might want to redirect to the appropriate page
-    if (action === "start-defect") {
-      router.push(`/detection?batch=${batchNumber}`)
-    } else if (action === "start-sorting") {
-      router.push(`/sorting?batch=${batchNumber}`)
+  // Fetch machine ID from session
+  useEffect(() => {
+    const fetchMachineId = async () => {
+      try {
+        const response = await fetch("/api/auth/session")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.machineId) {
+            setMachineId(data.machineId)
+          } else {
+            setError("Machine ID not found in session")
+          }
+        } else {
+          setError("Failed to fetch session data")
+        }
+      } catch (err) {
+        console.error("Error fetching machine ID:", err)
+        setError("Error fetching machine ID")
+      }
     }
-    setIsNewBatchFormOpen(false)
+
+    fetchMachineId()
+  }, [])
+
+  // Fetch batches when machineId is available
+  useEffect(() => {
+    if (!machineId) return
+
+    setLoading(true)
+
+    const batchesQuery = query(
+      collection(db, "batches"),
+      where("machine_id", "==", machineId),
+      orderBy("created_at", "desc"),
+    )
+
+    const unsubscribe = onSnapshot(
+      batchesQuery,
+      (snapshot) => {
+        const batchList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+
+        setBatches(batchList)
+
+        // Select the most recent active batch by default
+        if (!selectedBatch && batchList.length > 0) {
+          const activeBatch = batchList.find((batch) => batch.status === "active")
+          setSelectedBatch(activeBatch || batchList[0])
+        }
+
+        setLoading(false)
+      },
+      (err) => {
+        console.error("Error fetching batches:", err)
+        setError("Error fetching batches")
+        setLoading(false)
+      },
+    )
+
+    return () => unsubscribe()
+  }, [machineId, selectedBatch])
+
+  // Subscribe to egg inventory updates for the selected batch
+  useEffect(() => {
+    if (!selectedBatch) return
+
+    const inventoryQuery = query(
+      collection(db, "egg_inventory"),
+      where("batch_id", "==", selectedBatch.id),
+      orderBy("timestamp", "desc"),
+    )
+
+    const unsubscribe = onSnapshot(
+      inventoryQuery,
+      (snapshot) => {
+        // Track recent updates for animation
+        if (snapshot.docChanges().length > 0) {
+          const newUpdates = snapshot
+            .docChanges()
+            .filter((change) => change.type === "added" || change.type === "modified")
+            .map((change) => ({
+              id: change.doc.id,
+              timestamp: new Date().toISOString(),
+              data: change.doc.data(),
+              type: change.type,
+            }))
+
+          if (newUpdates.length > 0) {
+            setRecentUpdates((prev) => [...newUpdates, ...prev].slice(0, 5))
+
+            // Update batch with new egg counts
+            if (selectedBatch) {
+              const latestUpdate = newUpdates[0].data
+              if (latestUpdate && latestUpdate.size_counts) {
+                setSelectedBatch((prev) => ({
+                  ...prev,
+                  size_counts: latestUpdate.size_counts,
+                  total_count: Object.values(latestUpdate.size_counts).reduce((sum, count) => sum + count, 0),
+                }))
+              }
+            }
+          }
+        }
+      },
+      (err) => {
+        console.error("Error fetching egg inventory:", err)
+        setError("Error fetching egg inventory")
+      },
+    )
+
+    return () => unsubscribe()
+  }, [selectedBatch])
+
+  const handleBatchSelect = (batch) => {
+    setSelectedBatch(batch)
   }
 
-  const filteredBatches = batches.filter((batch) =>
-    batch.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleRefresh = () => {
+    // The real-time listeners will automatically refresh the data
+    // This is just a visual indicator for the user
+    setLoading(true)
+    setTimeout(() => setLoading(false), 500)
+  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
+      <div className="max-w-3xl mx-auto">
         <header className="flex items-center justify-between mb-6">
-          <Link href="/home" className="text-[#0e5f97] hover:text-[#0e4772] transition-colors">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
-          <h1 className="text-2xl font-bold text-[#0e5f97]">Inventory</h1>
-          <div className="w-6 h-6" /> {/* Placeholder for symmetry */}
-        </header>
-
-        {/* Search and New Batch Button */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="relative w-64">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search batches..."
-              className="w-full p-2 pl-10 border border-[#0e5f97] rounded-md"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#0e5f97]" />
+          <div className="flex items-center">
+            <Link href="/home" className="text-[#0e5f97] hover:text-[#0e4772] transition-colors mr-4">
+              <ArrowLeft className="w-6 h-6" />
+            </Link>
+            <h1 className="text-2xl font-bold text-[#0e5f97]">Egg Inventory</h1>
           </div>
           <button
-            onClick={() => setIsNewBatchFormOpen(!isNewBatchFormOpen)}
-            className="bg-[#0e5f97] text-[#fcfcfd] px-4 py-2 rounded-md hover:bg-[#0e4772] transition-colors flex items-center"
+            onClick={handleRefresh}
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            disabled={loading}
           >
-            {isNewBatchFormOpen ? <ChevronUp className="mr-2" /> : <ChevronDown className="mr-2" />}
-            {isNewBatchFormOpen ? "Close New Batch" : "New Batch"}
+            <RefreshCcw className={`w-5 h-5 text-[#0e5f97] ${loading ? "animate-spin" : ""}`} />
           </button>
-        </div>
+        </header>
 
-        {/* New Batch Form (Collapsible) */}
-        {isNewBatchFormOpen && (
-          <form onSubmit={handleSubmit} className="bg-[#fcfcfd] rounded-xl shadow-md p-6 mb-6">
-            <h2 className="text-lg font-semibold text-[#0e5f97] mb-4">New Batch</h2>
-            <div className="mb-6">
-              <label htmlFor="batchNumber" className="block text-sm font-medium text-[#171717] mb-1">
-                Batch Number
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="batchNumber"
-                  value={batchNumber}
-                  onChange={(e) => setBatchNumber(e.target.value)}
-                  className="w-full p-2 pl-10 border border-[#0e5f97] rounded-md"
-                  placeholder="Enter batch number"
-                  required
-                />
-                <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#0e5f97]" />
+        {error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>
+        ) : (
+          <>
+            {/* Batch Selector */}
+            <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+              <BatchSelector
+                batches={batches}
+                selectedBatch={selectedBatch}
+                onSelectBatch={handleBatchSelect}
+                loading={loading}
+              />
+            </div>
+
+            {/* Tabs */}
+            <div className="bg-white rounded-xl shadow-md mb-6">
+              <div className="flex border-b">
+                <button
+                  onClick={() => setActiveTab("summary")}
+                  className={`flex items-center gap-2 px-6 py-4 font-medium text-sm transition-colors ${
+                    activeTab === "summary"
+                      ? "border-b-2 border-[#0e5f97] text-[#0e5f97]"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Batch Summary
+                </button>
+                <button
+                  onClick={() => setActiveTab("inventory")}
+                  className={`flex items-center gap-2 px-6 py-4 font-medium text-sm transition-colors ${
+                    activeTab === "inventory"
+                      ? "border-b-2 border-[#0e5f97] text-[#0e5f97]"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  Inventory
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(eggCounts).map(([size, count]) => (
-                <div key={size} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#171717] capitalize">{size}</span>
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => handleCountChange(size, -1)}
-                      className="bg-[#ecb662] text-[#171717] p-1 rounded-md hover:bg-[#0e5f97] hover:text-[#fcfcfd] transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="mx-2 w-8 text-center">{count}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleCountChange(size, 1)}
-                      className="bg-[#ecb662] text-[#171717] p-1 rounded-md hover:bg-[#0e5f97] hover:text-[#fcfcfd] transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6">
-              <button
-                type="submit"
-                className="w-full bg-[#0e5f97] text-[#fcfcfd] p-2 rounded-md hover:bg-[#0e4772] transition-colors"
-              >
-                {action === "start-defect"
-                  ? "Start Defect Detection"
-                  : action === "start-sorting"
-                    ? "Start Sorting"
-                    : "Create New Batch"}
-              </button>
-            </div>
-          </form>
+            {/* Tab Content */}
+            {activeTab === "summary" ? (
+              <BatchSummaryTab selectedBatch={selectedBatch} loading={loading} recentUpdates={recentUpdates} />
+            ) : (
+              <InventoryTab selectedBatch={selectedBatch} loading={loading} recentUpdates={recentUpdates} />
+            )}
+          </>
         )}
-
-        {/* Existing Batches Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredBatches.map((batch) => (
-            <Link href={`/inventory/${batch.id}`} key={batch.id}>
-              <div className="bg-[#fcfcfd] rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
-                <h3 className="font-semibold text-[#0e5f97]">{batch.batchNumber}</h3>
-                <p className="text-sm text-[#171717]/60">{batch.date}</p>
-                <div className="flex justify-between items-center mt-2">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      batch.status === "Completed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {batch.status}
-                  </span>
-                  <span className="text-sm font-medium">{batch.totalEggs} eggs</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* System Status */}
-        <div className="mt-6 bg-[#fcfcfd] rounded-lg p-4 shadow-md">
-          <div className="text-sm text-center text-[#171717]/60">
-            System Status: <span className="text-[#0e5f97] font-medium">Online - Inventory Management</span>
-          </div>
-        </div>
       </div>
     </div>
   )
 }
+
