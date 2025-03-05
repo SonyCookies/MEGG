@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { db } from "../../firebaseConfig"
-import { collection, query, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, where } from "firebase/firestore"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import {
   Loader2,
@@ -141,14 +141,50 @@ export default function DailySummaryTab() {
   const [error, setError] = useState(null)
   const [defectLogs, setDefectLogs] = useState([])
   const [chartType, setChartType] = useState("area")
+  const [machineId, setMachineId] = useState(null)
+
+  // Fetch machine ID from session
+  useEffect(() => {
+    const fetchMachineId = async () => {
+      try {
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
+        }
+
+        if (!sessionData.machineId) {
+          throw new Error("Machine ID not found in session")
+        }
+
+        setMachineId(sessionData.machineId)
+        console.log("Machine ID set for daily summary:", sessionData.machineId)
+      } catch (err) {
+        console.error("Error fetching session:", err)
+        setError("Failed to authenticate session: " + err.message)
+      }
+    }
+
+    fetchMachineId()
+  }, [])
 
   // Fetch defect logs
   const fetchData = useCallback(async () => {
+    if (!machineId) {
+      console.log("Machine ID not available yet, waiting...")
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
+      console.log(`Fetching daily summary for machine ID: ${machineId}`)
+
+      // Update query to filter by machine_id
+      const q = query(collection(db, "defect_logs"), where("machine_id", "==", machineId), orderBy("timestamp", "desc"))
+
       const snapshot = await getDocs(q)
       const logs = snapshot.docs.map((doc) => {
         const data = doc.data()
@@ -161,21 +197,21 @@ export default function DailySummaryTab() {
         return { id: doc.id, ...data }
       })
 
-      console.log("Total logs fetched:", logs.length)
+      console.log(`Total logs fetched for machine ${machineId}:`, logs.length)
       setDefectLogs(logs)
-
     } catch (err) {
       console.error("Error fetching defect logs:", err)
       setError("Failed to load data. Please try again.")
-
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [machineId])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    if (machineId) {
+      fetchData()
+    }
+  }, [fetchData, machineId])
 
   // Process data for visualization
   const { dailyStats, chartData, trends, periodStats } = useMemo(() => {
