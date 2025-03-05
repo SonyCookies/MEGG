@@ -16,7 +16,7 @@ export default function DailySummary() {
         <div className="flex flex-col gap-1">
           <h3 className="text-xl font-medium text-gray-800">Daily Summary</h3>
           <p className="text-gray-500 text-sm">
-            Track defect patterns over time
+            Track sort patterns over time
           </p>
         </div>
         <button className="text-gray-500 hover:text-gray-700 absolute top-6 right-6">
@@ -47,7 +47,7 @@ export default function DailySummary() {
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center text-xs">
-                <p className="text-gray-500">Today's defects</p>
+                <p className="text-gray-500">Today's sort</p>
               </div>
               <div className="flex items-center text-xs text-green-500">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -68,7 +68,7 @@ export default function DailySummary() {
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center text-xs">
-                <p className="text-gray-500">Defects per day</p>
+                <p className="text-gray-500">Sort per day</p>
               </div>
               <div className="flex items-center text-xs opacity-0">
                 <span>placeholder</span>
@@ -101,12 +101,12 @@ export default function DailySummary() {
         </div>
       </div>
 
-      {/* Defect Trends Chart */}
+      {/* Sort Trends Chart */}
       <div className="border flex flex-col gap-6 rounded-lg p-6">
         <div className="flex flex-col gap-1">
-          <h3 className="font-medium text-gray-800">Defect Trends</h3>
+          <h3 className="font-medium text-gray-800">Sort Trends</h3>
           <p className="text-sm text-gray-500">
-            Daily defect distribution over time
+            Daily sort distribution over time
           </p>
         </div>
 
@@ -144,26 +144,44 @@ export default function DailySummary() {
         </div>
 
         {/* Legend */}
-        <div className="flex flex-col md:flex-row gap-4 justify-center">
-          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
-            <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-            <div className="flex items-center justify-between text-sm w-full gap-1">
-              <span className="">Dirty </span>
-              <span>(6)</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
-            <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
-            <div className="flex items-center justify-between text-sm w-full gap-1">
-              <span className="">Cracked</span>
-              <span>(7)</span>
-            </div>
-          </div>
+        <div className="flex flex-col lg:flex-row gap-4 justify-center">
           <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
             <span className="w-3 h-3 rounded-full bg-blue-500"></span>
             <div className="flex items-center justify-between text-sm w-full gap-1">
-              <span className="">Good</span>
-              <span>(8)</span>
+              <span className="">Small</span>
+              <span>(22%)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
+            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+            <div className="flex items-center justify-between text-sm w-full gap-1">
+              <span className="">Medium</span>
+              <span>(22%)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
+            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+            <div className="flex items-center justify-between text-sm w-full gap-1">
+              <span className="">Large</span>
+              <span>(22%)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
+            <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+            <div className="flex items-center justify-between text-sm w-full gap-1">
+              <span className="">XL</span>
+              <span>(22%)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
+            <span className="w-3 h-3 rounded-full bg-red-500"></span>
+            <div className="flex items-center justify-between text-sm w-full gap-1">
+              <span className="">Jumbo</span>
+              <span>(22%)</span>
             </div>
           </div>
         </div>
