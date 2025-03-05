@@ -1,5 +1,4 @@
 //D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\contexts\InternetConnectionContext.js
-
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
@@ -21,6 +20,38 @@ const logger = {
   },
 }
 
+// Add a sync lock to prevent multiple simultaneous sync operations
+let isSyncing = false
+let syncScheduled = false
+
+// Function to safely run sync with a lock
+const runSyncWithLock = async () => {
+  if (isSyncing) {
+    // If a sync is already in progress, schedule another one for after it completes
+    logger.log("Sync already in progress, scheduling another sync")
+    syncScheduled = true
+    return
+  }
+
+  try {
+    isSyncing = true
+    logger.log("Starting sync operation")
+    await syncData()
+    logger.log("Sync operation completed")
+  } catch (error) {
+    logger.error(`Error during sync: ${error.message}`)
+  } finally {
+    isSyncing = false
+
+    // If another sync was scheduled while this one was running, run it now
+    if (syncScheduled) {
+      logger.log("Running scheduled sync")
+      syncScheduled = false
+      runSyncWithLock()
+    }
+  }
+}
+
 export const useInternetConnection = () => {
   const context = useContext(InternetConnectionContext)
   if (context === undefined) {
@@ -34,6 +65,7 @@ export const InternetConnectionProvider = ({ children }) => {
   const [isOnline, setIsOnline] = useState(true)
   const checkIntervalRef = useRef(null)
   const isCheckingRef = useRef(false)
+  const lastOnlineState = useRef(true)
 
   // Check actual internet connectivity by pinging a reliable endpoint
   const checkConnectivity = useCallback(async () => {
@@ -85,6 +117,7 @@ export const InternetConnectionProvider = ({ children }) => {
       // Only proceed with connectivity check if navigator reports online
       if (!navigatorStatus) {
         setIsOnline(false)
+        lastOnlineState.current = false
         logger.log("Device reports offline")
         return
       }
@@ -92,13 +125,16 @@ export const InternetConnectionProvider = ({ children }) => {
       // Check actual connectivity
       const hasInternet = await checkConnectivity()
 
+      // Only trigger sync if transitioning from offline to online
+      const wasOffline = !lastOnlineState.current
+      lastOnlineState.current = hasInternet
+
       setIsOnline(hasInternet)
       logger.log(`Internet connection status changed to: ${hasInternet ? "online" : "offline"}`)
 
-      if (hasInternet) {
-        syncData().catch((error) => {
-          logger.error(`Error syncing data: ${error.message}`)
-        })
+      if (hasInternet && wasOffline) {
+        logger.log("Connection restored, triggering sync")
+        runSyncWithLock()
       }
     },
     [checkConnectivity],
@@ -109,14 +145,25 @@ export const InternetConnectionProvider = ({ children }) => {
     if (typeof window === "undefined") return
 
     const startPeriodicCheck = () => {
+      // Commented out periodic check
+      /* 
       checkIntervalRef.current = setInterval(async () => {
         const navigatorStatus = navigator.onLine
         await updateOnlineStatus(navigatorStatus)
       }, CHECK_INTERVAL)
+      */
     }
 
-    const handleOnline = () => updateOnlineStatus(true)
-    const handleOffline = () => updateOnlineStatus(false)
+    // Only sync on the "online" event, not on every periodic check
+    const handleOnline = () => {
+      logger.log("Browser 'online' event fired")
+      updateOnlineStatus(true)
+    }
+
+    const handleOffline = () => {
+      logger.log("Browser 'offline' event fired")
+      updateOnlineStatus(false)
+    }
 
     window.addEventListener("online", handleOnline)
     window.addEventListener("offline", handleOffline)
