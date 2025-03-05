@@ -14,7 +14,6 @@ import { ConnectionStatus } from "../components/ConnectionStatus"
 
 // Import components
 import VideoDisplay from "./components/VideoDisplay"
-import MachineIdStatus from "./components/MachineIdStatus"
 import ErrorMessage from "./components/ErrorMessage"
 import UploadStatus from "./components/UploadStatus"
 import BatchSelectionModal from "./components/BatchSelectionModal"
@@ -324,28 +323,24 @@ export default function DetectionPage() {
           <div className="w-6 h-6" />
         </header>
 
-        {/* Machine ID Status */}
-        <div className="mb-4">
-          <MachineIdStatus status={machineIdStatus} machineId={machineId} />
-        </div>
 
         {/* Batch Info (if available) */}
         {currentBatch && (
           <div className="mb-6 bg-white rounded-lg p-3 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <span className="text-sm font-medium text-[#0e5f97] mr-2">Batch: {currentBatch.batch_number}</span>
+                <span className="text-base font-medium text-[#0e5f97] mr-2">Batch: {currentBatch.batch_number}</span>
                 <button
                   onClick={() => setShowBatchDetails(!showBatchDetails)}
                   className="text-[#0e5f97] hover:text-[#0e4772]"
                   aria-label="Toggle batch details"
                 >
-                  <Info className="w-4 h-4" />
+                  <Info className="w-5 h-5" />
                 </button>
               </div>
               <button
                 onClick={handleCompleteBatch}
-                className="text-xs bg-[#0e5f97] text-white px-2 py-1 rounded hover:bg-[#0e4772] transition-colors"
+                className="text-sm bg-[#0e5f97] text-white px-3 py-1 rounded hover:bg-[#0e4772] transition-colors"
               >
                 Complete Batch
               </button>

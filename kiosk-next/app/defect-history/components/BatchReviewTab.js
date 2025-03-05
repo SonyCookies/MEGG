@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { db } from "../../firebaseConfig"
-import { collection, query, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, where, doc, getDoc } from "firebase/firestore"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { Loader2, Package, AlertCircle, Timer, RefreshCcw, Info } from "lucide-react"
 
@@ -188,6 +188,7 @@ const TimelineTooltip = ({ active, payload, label }) => {
 // Updated BatchSummaryCard Component
 const BatchSummaryCard = ({ batch, stats, onClick, isSelected }) => {
   const mainDefectColor = getDefectColor("default") // Using default color for consistency
+  const batchNumber = stats.batch_number || `Batch ${batch.substring(0, 6)}`
 
   // Format date with time
   const formatDateWithTime = (timestamp) => {
@@ -209,7 +210,7 @@ const BatchSummaryCard = ({ batch, stats, onClick, isSelected }) => {
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <h4 className="font-medium text-[#0e4772]">Batch {batch}</h4>
+          <h4 className="font-medium text-[#0e4772]">{batchNumber}</h4>
           <div className="space-y-0.5">
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
@@ -236,6 +237,66 @@ export default function BatchReviewTab() {
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [chartType, setChartType] = useState("pie")
   const [timePeriod, setTimePeriod] = useState("24h")
+  const [machineId, setMachineId] = useState(null)
+  const [batchCache, setBatchCache] = useState({}) // Cache for batch data
+
+  // Fetch machine ID from session
+  useEffect(() => {
+    const fetchMachineId = async () => {
+      try {
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
+        }
+
+        if (!sessionData.machineId) {
+          throw new Error("Machine ID not found in session")
+        }
+
+        setMachineId(sessionData.machineId)
+        console.log("Machine ID set for batch review:", sessionData.machineId)
+      } catch (err) {
+        console.error("Error fetching session:", err)
+        setError("Failed to authenticate session: " + err.message)
+      }
+    }
+
+    fetchMachineId()
+  }, [])
+
+  // Function to fetch batch data
+  const fetchBatchData = useCallback(
+    async (batchId) => {
+      // Check if we already have this batch in cache
+      if (batchCache[batchId]) {
+        return batchCache[batchId]
+      }
+
+      try {
+        const batchRef = doc(db, "batches", batchId)
+        const batchSnap = await getDoc(batchRef)
+
+        if (batchSnap.exists()) {
+          const batchData = batchSnap.data()
+          // Update cache
+          setBatchCache((prev) => ({
+            ...prev,
+            [batchId]: { id: batchId, ...batchData },
+          }))
+          return { id: batchId, ...batchData }
+        } else {
+          console.log(`No batch found with ID: ${batchId}`)
+          return { id: batchId, batch_number: "Unknown" }
+        }
+      } catch (err) {
+        console.error(`Error fetching batch ${batchId}:`, err)
+        return { id: batchId, batch_number: "Error" }
+      }
+    },
+    [batchCache],
+  )
 
   // Process batch data
   const { batchStats, batchList } = useMemo(() => {
@@ -257,48 +318,45 @@ export default function BatchReviewTab() {
 
     const filteredLogs = defectLogs.filter((log) => {
       const logDate = new Date(log.timestamp)
-      console.log(`Comparing log:
-    - Log timestamp: ${log.timestamp}
-    - Parsed date: ${logDate.toISOString()}
-    - Include? ${logDate >= periodStart}`)
-      return true // Temporarily accept all logs to see the raw data
+      return logDate >= periodStart
     })
 
     console.log(`Filtering results:
-  - Original logs: ${defectLogs.length}
-  - Filtered logs: ${filteredLogs.length}
-  - First log timestamp: ${filteredLogs[0]?.timestamp}
-  - Last log timestamp: ${filteredLogs[filteredLogs.length - 1]?.timestamp}`)
+- Original logs: ${defectLogs.length}
+- Filtered logs: ${filteredLogs.length}`)
 
+    // Group by batch_id instead of batch_number
     const stats = filteredLogs.reduce((acc, log) => {
-      const batch = log.batch_number
-      if (!batch) {
-        console.warn("Log missing batch_number:", log)
+      const batchId = log.batch_id
+      if (!batchId) {
+        console.warn("Log missing batch_id:", log)
         return acc
       }
 
-      if (!acc[batch]) {
-        acc[batch] = {
+      if (!acc[batchId]) {
+        acc[batchId] = {
           defects: [],
           byType: {},
           startTime: log.timestamp,
           endTime: log.timestamp,
+          batch_id: batchId,
+          batch_number: log.batch_number || "Loading...", // Will be updated with batch data
         }
       }
 
-      acc[batch].defects.push(log)
-      acc[batch].byType[log.defect_type] = (acc[batch].byType[log.defect_type] || 0) + 1
+      acc[batchId].defects.push(log)
+      acc[batchId].byType[log.defect_type] = (acc[batchId].byType[log.defect_type] || 0) + 1
 
       // Update start and end times
       const logTime = new Date(log.timestamp).getTime()
-      const startTime = new Date(acc[batch].startTime).getTime()
-      const endTime = new Date(acc[batch].endTime).getTime()
+      const startTime = new Date(acc[batchId].startTime).getTime()
+      const endTime = new Date(acc[batchId].endTime).getTime()
 
       if (logTime < startTime) {
-        acc[batch].startTime = log.timestamp
+        acc[batchId].startTime = log.timestamp
       }
       if (logTime > endTime) {
-        acc[batch].endTime = log.timestamp
+        acc[batchId].endTime = log.timestamp
       }
 
       return acc
@@ -345,18 +403,26 @@ export default function BatchReviewTab() {
 
   // Fetch defect logs
   const fetchData = useCallback(async () => {
+    if (!machineId) {
+      console.log("Machine ID not available yet, waiting...")
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
+      console.log(`Fetching batch review data for machine ID: ${machineId}`)
+
+      // Update query to filter by machine_id
+      const q = query(collection(db, "defect_logs"), where("machine_id", "==", machineId), orderBy("timestamp", "desc"))
+
       const snapshot = await getDocs(q)
 
-      console.log("Fetched documents:", snapshot.size)
+      console.log(`Fetched ${snapshot.size} documents for machine ${machineId}`)
 
       const logs = snapshot.docs.map((doc) => {
         const data = doc.data()
-        console.log("Document data:", data)
 
         // Handle different timestamp formats
         let timestamp = data.timestamp
@@ -375,11 +441,11 @@ export default function BatchReviewTab() {
           id: doc.id,
           ...data,
           timestamp: timestamp,
-          batch_number: data.batch_number || data.batchNumber || "UNKNOWN", // Handle different field names
+          batch_id: data.batch_id, // Make sure we capture batch_id
         }
       })
 
-      console.log("Processed logs:", logs)
+      console.log(`Processed ${logs.length} logs for machine ${machineId}`)
       setDefectLogs(logs)
     } catch (err) {
       console.error("Error fetching defect logs:", err)
@@ -387,12 +453,67 @@ export default function BatchReviewTab() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [machineId])
+
+  // Add this effect to fetch batch information
+  useEffect(() => {
+    const fetchBatchInfo = async () => {
+      if (!batchList.length) return
+
+      const batchesToFetch = batchList.filter(
+        (batchId) => !batchCache[batchId] || batchCache[batchId]?.batch_number === "Loading...",
+      )
+
+      if (batchesToFetch.length === 0) return
+
+      console.log(`Fetching information for ${batchesToFetch.length} batches`)
+
+      for (const batchId of batchesToFetch) {
+        try {
+          const batchRef = doc(db, "batches", batchId)
+          const batchSnap = await getDoc(batchRef)
+
+          if (batchSnap.exists()) {
+            const batchData = batchSnap.data()
+            setBatchCache((prev) => ({
+              ...prev,
+              [batchId]: {
+                batch_number: batchData.batch_number || `Batch ${batchId.substring(0, 6)}`,
+                ...batchData,
+              },
+            }))
+
+            // Update the batch stats with the batch number
+            batchStats[batchId].batch_number = batchData.batch_number || `Batch ${batchId.substring(0, 6)}`
+          } else {
+            console.log(`No batch found with ID: ${batchId}`)
+            setBatchCache((prev) => ({
+              ...prev,
+              [batchId]: { batch_number: `Batch ${batchId.substring(0, 6)}` },
+            }))
+
+            // Update with a fallback batch number
+            batchStats[batchId].batch_number = `Batch ${batchId.substring(0, 6)}`
+          }
+        } catch (err) {
+          console.error(`Error fetching batch ${batchId}:`, err)
+          setBatchCache((prev) => ({
+            ...prev,
+            [batchId]: { batch_number: `Batch ${batchId.substring(0, 6)}` },
+          }))
+        }
+      }
+    }
+
+    fetchBatchInfo()
+  }, [batchList, batchStats, batchCache])
 
   // Initial fetch
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    if (machineId) {
+      fetchData()
+    }
+  }, [fetchData, machineId])
 
   if (error) {
     return (

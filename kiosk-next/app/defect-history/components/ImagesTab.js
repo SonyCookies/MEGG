@@ -1,10 +1,8 @@
-// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\defect-history\components\ImagesTab.js
-
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { db, storage } from "../../firebaseConfig"
-import { collection, query, orderBy, limit, startAfter, getDocs, where } from "firebase/firestore"
+import { collection, query, orderBy, limit, startAfter, getDocs, where, getCountFromServer } from "firebase/firestore"
 import { ref, getDownloadURL } from "firebase/storage"
 import {
   Loader2,
@@ -18,6 +16,7 @@ import {
   ImageIcon,
   X,
   ChevronDown,
+  RefreshCcw,
 } from "lucide-react"
 
 // Constants
@@ -129,6 +128,8 @@ export default function ImagesTab() {
     sortBy: "newest",
   })
   const [machineId, setMachineId] = useState(null)
+  const [batchOptions, setBatchOptions] = useState([]) // List of all batch numbers for the filter dropdown
+  const [totalItems, setTotalItems] = useState(0)
 
   // Fetch machine ID from session
   useEffect(() => {
@@ -156,6 +157,38 @@ export default function ImagesTab() {
 
     fetchMachineId()
   }, [])
+
+  // Fetch batch options for dropdown
+  useEffect(() => {
+    const fetchBatchOptions = async () => {
+      if (!machineId) return
+
+      try {
+        const batchesRef = collection(db, "batches")
+        const q = query(batchesRef, where("machine_id", "==", machineId))
+        const snapshot = await getDocs(q)
+
+        const options = []
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          if (data.batch_number) {
+            options.push({
+              id: doc.id,
+              batch_number: data.batch_number,
+            })
+          }
+        })
+
+        setBatchOptions(options)
+      } catch (err) {
+        console.error("Error fetching batch options:", err)
+      }
+    }
+
+    if (machineId) {
+      fetchBatchOptions()
+    }
+  }, [machineId])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -193,12 +226,13 @@ export default function ImagesTab() {
       const processedImages = docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-        path: `images/${doc.data().batch_number}/${doc.data().image_id}`,
+        path: doc.data().image_id ? `images/${doc.data().batch_id}/${doc.data().image_id}` : null,
         imageUrl: null,
       }))
 
       // Fetch all image URLs in parallel
       const imagePromises = processedImages.map(async (image) => {
+        if (!image.path) return { ...image, imageUrl: null }
         const url = await fetchImageUrl(image.path)
         return { ...image, imageUrl: url }
       })
@@ -209,79 +243,174 @@ export default function ImagesTab() {
     [fetchImageUrl],
   )
 
-  // Fetch images from Firestore
+  // Function to fetch total count with filters
+  const fetchTotalCount = useCallback(async () => {
+    if (!machineId) return
+
+    try {
+      const logsRef = collection(db, "defect_logs")
+
+      // Start building the query with the machine_id
+      const queryConstraints = [where("machine_id", "==", machineId)]
+
+      // Add filter for defect type
+      if (filters.defectType !== "all") {
+        queryConstraints.push(where("defect_type", "==", filters.defectType))
+      }
+
+      // Add filter for date
+      if (filters.date) {
+        const startDate = new Date(filters.date)
+        startDate.setHours(0, 0, 0, 0)
+
+        const endDate = new Date(filters.date)
+        endDate.setHours(23, 59, 59, 999)
+
+        queryConstraints.push(where("timestamp", ">=", startDate.toISOString()))
+        queryConstraints.push(where("timestamp", "<=", endDate.toISOString()))
+      }
+
+      // Add filter for batch
+      if (filters.batchNumber) {
+        // Find batch ID for the selected batch number
+        const selectedBatch = batchOptions.find((batch) => batch.batch_number === filters.batchNumber)
+        if (selectedBatch) {
+          queryConstraints.push(where("batch_id", "==", selectedBatch.id))
+        }
+      }
+
+      const q = query(logsRef, ...queryConstraints)
+      const snapshot = await getCountFromServer(q)
+      setTotalItems(snapshot.data().count)
+      console.log(`Found ${snapshot.data().count} filtered images for machine ${machineId}`)
+    } catch (err) {
+      console.error("Error fetching total count:", err)
+      setError("Failed to count images")
+    }
+  }, [machineId, filters, batchOptions])
+
+  // Fetch images from Firestore with filters
   const fetchImages = useCallback(
     async (lastDoc = null) => {
-      try {
-        if (!machineId) {
-          console.log("Machine ID not available yet, waiting...")
-          return []
-        }
+      if (!machineId) {
+        console.log("Machine ID not available yet, waiting...")
+        return []
+      }
 
-        console.log(`Fetching images for machine ID: ${machineId}`)
+      try {
+        console.log(`Fetching images for machine ID: ${machineId} with filters:`, filters)
         const imagesRef = collection(db, "defect_logs")
 
-        // Add machine_id filter to the query
-        let q = query(
-          imagesRef,
-          where("machine_id", "==", machineId),
-          orderBy("timestamp", "desc"),
-          limit(ITEMS_PER_PAGE),
-        )
+        // Start building the query with machine_id
+        const queryConstraints = [where("machine_id", "==", machineId)]
 
-        if (lastDoc) {
-          q = query(
-            imagesRef,
-            where("machine_id", "==", machineId),
-            orderBy("timestamp", "desc"),
-            startAfter(lastDoc),
-            limit(ITEMS_PER_PAGE),
-          )
+        // Add filter for defect type
+        if (filters.defectType !== "all") {
+          queryConstraints.push(where("defect_type", "==", filters.defectType))
         }
+
+        // Add filter for date
+        if (filters.date) {
+          const startDate = new Date(filters.date)
+          startDate.setHours(0, 0, 0, 0)
+
+          const endDate = new Date(filters.date)
+          endDate.setHours(23, 59, 59, 999)
+
+          queryConstraints.push(where("timestamp", ">=", startDate.toISOString()))
+          queryConstraints.push(where("timestamp", "<=", endDate.toISOString()))
+        }
+
+        // Add filter for batch
+        if (filters.batchNumber) {
+          // Find batch ID for the selected batch number
+          const selectedBatch = batchOptions.find((batch) => batch.batch_number === filters.batchNumber)
+          if (selectedBatch) {
+            queryConstraints.push(where("batch_id", "==", selectedBatch.id))
+          }
+        }
+
+        // Add sorting
+        queryConstraints.push(orderBy("timestamp", filters.sortBy === "newest" ? "desc" : "asc"))
+
+        // Add pagination
+        if (lastDoc) {
+          queryConstraints.push(startAfter(lastDoc))
+        }
+
+        queryConstraints.push(limit(ITEMS_PER_PAGE))
+
+        // Build the final query
+        const q = query(imagesRef, ...queryConstraints)
 
         const snapshot = await getDocs(q)
         console.log(`Found ${snapshot.docs.length} images for machine ${machineId}`)
-        const processedImages = await processImages(snapshot.docs)
 
-        if (isMounted.current) {
-          setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null)
-          setHasMore(snapshot.docs.length === ITEMS_PER_PAGE)
+        // Always update pagination state
+        setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null)
+        setHasMore(snapshot.docs.length === ITEMS_PER_PAGE)
+
+        if (snapshot.docs.length === 0) {
+          return []
         }
 
+        const processedImages = await processImages(snapshot.docs)
         return processedImages
       } catch (error) {
         console.error("Error fetching images:", error)
-        throw new Error("Failed to fetch images")
+        return []
       }
     },
-    [processImages, machineId],
+    [processImages, machineId, filters, batchOptions],
   )
 
-  // Initial load - triggered when machineId changes
+  // Update total count when filters change
   useEffect(() => {
+    if (machineId) {
+      fetchTotalCount()
+    }
+  }, [fetchTotalCount, machineId])
+
+  // Initial load - triggered when machineId or filters change
+  useEffect(() => {
+    let isMounted = true
+
     const loadInitialData = async () => {
       if (!machineId) return // Wait until machineId is available
 
       try {
         setLoading(true)
         setError(null)
-        const initialImages = await fetchImages()
 
-        if (isMounted.current) {
-          setImages(initialImages)
+        console.log("Starting to fetch images...")
+        const initialImages = await fetchImages()
+        console.log("Finished fetching images, count:", initialImages.length)
+
+        if (isMounted) {
+          setImages(initialImages || [])
+          // Force loading to false with a slight delay to ensure state updates properly
+          setTimeout(() => {
+            if (isMounted) {
+              console.log("Setting loading to false")
+              setLoading(false)
+            }
+          }, 100)
         }
       } catch (err) {
-        if (isMounted.current) {
-          setError(err.message)
-        }
-      } finally {
-        if (isMounted.current) {
+        console.error("Error in loadInitialData:", err)
+        if (isMounted) {
+          setError(err.message || "Failed to load images")
+          setImages([])
           setLoading(false)
         }
       }
     }
 
     loadInitialData()
+
+    return () => {
+      isMounted = false
+    }
   }, [fetchImages, machineId])
 
   // Load more
@@ -306,29 +435,56 @@ export default function ImagesTab() {
     }
   }
 
-  // Filter images
+  // Function to handle search apply
+  const handleApplySearch = () => {
+    console.log("Applying search...")
+    setLoading(true)
+
+    setTimeout(async () => {
+      try {
+        const newImages = await fetchImages()
+        console.log("Search complete, found:", newImages.length)
+        setImages(newImages || [])
+      } catch (err) {
+        console.error("Error in search:", err)
+        setError(err.message || "Failed to search images")
+        setImages([])
+      } finally {
+        console.log("Setting loading to false after search")
+        setLoading(false)
+      }
+    }, 100)
+  }
+
+  // Refresh data
+  const handleRefresh = () => {
+    console.log("Refreshing data...")
+    setLoading(true)
+
+    setTimeout(async () => {
+      try {
+        const newImages = await fetchImages()
+        console.log("Refresh complete, found:", newImages.length)
+        setImages(newImages || [])
+      } catch (err) {
+        console.error("Error in refresh:", err)
+        setError(err.message || "Failed to refresh images")
+        setImages([])
+      } finally {
+        console.log("Setting loading to false after refresh")
+        setLoading(false)
+      }
+    }, 100)
+  }
+
+  // Filter images for search query (client-side)
   const filteredImages = images.filter((image) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      image.batch_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      image.defect_type.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!searchQuery) return true
 
-    const matchesType =
-      filters.defectType === "all" || image.defect_type.toLowerCase() === filters.defectType.toLowerCase()
-
-    const matchesDate = !filters.date || new Date(image.timestamp).toISOString().split("T")[0] === filters.date
-
-    const matchesBatch = !filters.batchNumber || image.batch_number === filters.batchNumber
-
-    return matchesSearch && matchesType && matchesDate && matchesBatch
-  })
-
-  // Sort images
-  const sortedImages = [...filteredImages].sort((a, b) => {
-    if (filters.sortBy === "newest") {
-      return new Date(b.timestamp) - new Date(a.timestamp)
-    }
-    return new Date(a.timestamp) - new Date(b.timestamp)
+    return (
+      (image.batch_number && image.batch_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (image.defect_type && image.defect_type.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
   })
 
   // Export data
@@ -337,7 +493,7 @@ export default function ImagesTab() {
       ["Timestamp", "Batch Number", "Defect Type", "Confidence Score", "Image URL"],
       ...filteredImages.map((image) => [
         formatDate(image.timestamp),
-        image.batch_number,
+        image.batch_number || "Unknown",
         image.defect_type,
         (image.confidence_score * 100).toFixed(1) + "%",
         image.imageUrl || "Not available",
@@ -357,6 +513,8 @@ export default function ImagesTab() {
     URL.revokeObjectURL(url)
   }
 
+  // Refresh data
+
   if (error) {
     return (
       <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
@@ -371,15 +529,33 @@ export default function ImagesTab() {
     )
   }
 
+  console.log("Render state:", {
+    loading,
+    imagesLength: images.length,
+    filteredImagesLength: filteredImages.length,
+    hasError: !!error,
+    machineId,
+    filters,
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
-          <ImageIcon className="w-6 h-6" />
-          Image Gallery
-        </h2>
-        <p className="text-gray-500">View and analyze defect detection images for machine {machineId}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#0e4772] flex items-center gap-2">
+            <ImageIcon className="w-6 h-6" />
+            Image Gallery
+          </h2>
+          <p className="text-gray-500">View and analyze defect detection images for machine {machineId}</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Refresh images"
+        >
+          <RefreshCcw className="w-5 h-5 text-gray-600" />
+        </button>
       </div>
 
       {/* Search and Filters */}
@@ -392,8 +568,15 @@ export default function ImagesTab() {
               placeholder="Search by batch number or defect type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleApplySearch()}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e5f97]"
             />
+            <button
+              onClick={handleApplySearch}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-2 py-1 bg-[#0e5f97] text-white text-xs rounded hover:bg-[#0e4772]"
+            >
+              Search
+            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -448,9 +631,9 @@ export default function ImagesTab() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               >
                 <option value="">All Batches</option>
-                {[...new Set(images.map((img) => img.batch_number))].map((batch) => (
-                  <option key={batch} value={batch}>
-                    {batch}
+                {batchOptions.map((batch) => (
+                  <option key={batch.id} value={batch.batch_number}>
+                    {batch.batch_number}
                   </option>
                 ))}
               </select>
@@ -475,7 +658,7 @@ export default function ImagesTab() {
         <div className="flex justify-center items-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-[#0e5f97]" />
         </div>
-      ) : sortedImages.length === 0 ? (
+      ) : filteredImages.length === 0 ? (
         <div className="text-center py-12">
           <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No images found</h3>
@@ -483,7 +666,7 @@ export default function ImagesTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedImages.map((image) => {
+          {filteredImages.map((image) => {
             const style = getDefectStyle(image.defect_type)
             return (
               <div
@@ -511,7 +694,7 @@ export default function ImagesTab() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Package2 className="h-4 w-4" />
-                        <span>{image.batch_number}</span>
+                        <span>{image.batch_number || "Unknown"}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
@@ -571,7 +754,7 @@ export default function ImagesTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Batch Number</p>
-                  <p className="font-medium">{selectedImage.batch_number}</p>
+                  <p className="font-medium">{selectedImage.batch_number || "Unknown"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Defect Type</p>
