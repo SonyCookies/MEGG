@@ -1,8 +1,9 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\defect-history\components\StatisticsTab.js
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { db } from "../../firebaseConfig"
-import { collection, query, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, where } from "firebase/firestore"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts"
 import {
   Loader2,
@@ -148,24 +149,61 @@ export default function StatisticsTab() {
   const [hoveredBar, setHoveredBar] = useState(null)
   const [timePeriod, setTimePeriod] = useState("24h")
   const [chartType, setChartType] = useState("bar")
+  const [machineId, setMachineId] = useState(null)
+
+  // Fetch machine ID from session
+  useEffect(() => {
+    const fetchMachineId = async () => {
+      try {
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
+        }
+
+        if (!sessionData.machineId) {
+          throw new Error("Machine ID not found in session")
+        }
+
+        setMachineId(sessionData.machineId)
+        console.log("Machine ID set for statistics:", sessionData.machineId)
+      } catch (err) {
+        console.error("Error fetching session:", err)
+        setError("Failed to authenticate session: " + err.message)
+      }
+    }
+
+    fetchMachineId()
+  }, [])
 
   // Fetch defect logs
   const fetchData = useCallback(async () => {
+    if (!machineId) {
+      console.log("Machine ID not available yet, waiting...")
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      const q = query(collection(db, "defect_logs"), orderBy("timestamp", "desc"))
+      console.log(`Fetching statistics for machine ID: ${machineId}`)
+
+      // Update query to filter by machine_id
+      const q = query(collection(db, "defect_logs"), where("machine_id", "==", machineId), orderBy("timestamp", "desc"))
+
       const snapshot = await getDocs(q)
       const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
+      console.log(`Found ${logs.length} defect logs for machine ${machineId}`)
       setDefectLogs(logs)
 
       // Log successful data fetch
       // await addAccessLog({
       //   action: "statistics_view",
       //   status: "success",
-      //   details: `Statistics data fetched successfully - ${logs.length} records`,
+      //   details: `Statistics data fetched successfully - ${logs.length} records for machine ${machineId}`,
       // })
     } catch (err) {
       console.error("Error fetching defect logs:", err)
@@ -181,11 +219,13 @@ export default function StatisticsTab() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [machineId])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    if (machineId) {
+      fetchData()
+    }
+  }, [fetchData, machineId])
 
   // Calculate statistics
   const stats = useMemo(() => {
