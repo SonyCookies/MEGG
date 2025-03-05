@@ -99,7 +99,7 @@ export default function SettingsMenu({
           className="flex items-center justify-between"
         >
           <div className="flex items-center gap-4 font-semibold">
-            <selectedItem.icon className="w-5 h-5" />
+            <selectedItem.icon className="w-5 h-5 text-blue-500" />
             <div className="flex items-center gap-1 text">
               {selectedItem?.name || "Select Option"}
               <ChevronDown
