@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Navbar } from "../../components/NavBar";
 import { Sidebar } from "../../components/Sidebar";
 import Notifications from "../../components/ui/NotificationDesktop";
-import { Egg } from "lucide-react";
+import { Bug,ArrowUpWideNarrow } from "lucide-react";
 
 import Sort from "./components/Sort";
 import Defect from "./components/Defect";
@@ -48,28 +48,28 @@ export default function HistoryPage() {
                 <div className="flex items-center justify-center gap-4">
                   <button
                     onClick={() => setActiveComponent("sort")}
-                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-4 transition-colors duration-150 
+                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-2 transition-colors duration-150 
                       ${
                         activeComponent === "sort"
                           ? "bg-blue-500 text-white hover:bg-blue-600"
                           : "bg-white hover:bg-gray-200"
                       }`}
                   >
-                    <Egg className="w-5 h-5" />
-                    Egg Sort
+                    <ArrowUpWideNarrow className="w-5 h-5" />
+                    Sort History
                   </button>
 
                   <button
                     onClick={() => setActiveComponent("defect")}
-                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-4 transition-colors duration-150 
+                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-2 transition-colors duration-150 
                       ${
                         activeComponent === "defect"
                           ? "bg-blue-500 text-white hover:bg-blue-600"
                           : "bg-white hover:bg-gray-200"
                       }`}
                   >
-                    <Egg className="w-5 h-5" />
-                    Egg Defect
+                    <Bug className="w-5 h-5" />
+                    Defect History
                   </button>
                 </div>
 
