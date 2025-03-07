@@ -42,7 +42,7 @@ export default function Account() {
           throw new Error(data.error || "Session invalid")
         }
 
-        console.log("Session data:", data)
+        // console.log("Session data:", data)
         setMachineId(data.machineId)
       } catch (error) {
         console.error("Auth check error:", error)
