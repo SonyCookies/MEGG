@@ -263,12 +263,21 @@ export default function AddMachines() {
         return
       }
 
-      // Success
-      setGlobalMessage("Machine linked successfully!")
-      setFormData({ machineCode: "" }) // Reset form
-      setScannedMachine(null) // Clear scanned machine data
-      setShowPinInput(false) // Hide PIN input
-      setPin("") // Clear PIN
+      // Check if the machine is already linked
+      if (linkResult.alreadyLinked) {
+        setGlobalMessage(linkResult.message)
+        setFormData({ machineCode: "" }) // Reset form
+        setScannedMachine(null) // Clear scanned machine data
+        setShowPinInput(false) // Hide PIN input
+        setPin("") // Clear PIN
+      } else {
+        // Success for new link
+        setGlobalMessage("Machine linked successfully!")
+        setFormData({ machineCode: "" }) // Reset form
+        setScannedMachine(null) // Clear scanned machine data
+        setShowPinInput(false) // Hide PIN input
+        setPin("") // Clear PIN
+      }
     } catch (error) {
       console.error("Error linking machine:", error)
       setGlobalMessage("Error connecting to server. Please try again.")
@@ -589,6 +598,4 @@ export default function AddMachines() {
     </>
   )
 }
-
-
 
