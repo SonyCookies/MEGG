@@ -4,12 +4,15 @@ import { useState } from "react";
 import { Navbar } from "../../components/NavBar";
 import { Sidebar } from "../../components/Sidebar";
 import Notifications from "../../components/ui/NotificationDesktop";
+import { Bug,ArrowUpWideNarrow } from "lucide-react";
 
-import {Egg} from 'lucide-react'
+import Sort from "./components/Sort";
+import Defect from "./components/Defect";
 
 export default function HistoryPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [activeComponent, setActiveComponent] = useState("sort");
 
   const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
@@ -39,25 +42,39 @@ export default function HistoryPage() {
             />
 
             {/* right */}
-            <div className="w-full flex gap-6">
-              <div className="flex flex-1 flex-col gap-6">
+            <div className=" flex w-full gap-6">
+              <div className="flex flex-col flex-1 gap-6 w-full">
                 {/* Toggle Buttons */}
                 <div className="flex items-center justify-center gap-4">
-                  <button className="rounded-2xl border px-8 py-4 flex items-center justify-center gap-4 transition-colors duration-150 bg-white hover:bg-gray-200">
-                    <Egg className="w-5 h-5" />
-                    Egg Sort
+                  <button
+                    onClick={() => setActiveComponent("sort")}
+                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-2 transition-colors duration-150 
+                      ${
+                        activeComponent === "sort"
+                          ? "bg-blue-500 text-white hover:bg-blue-600"
+                          : "bg-white hover:bg-gray-200"
+                      }`}
+                  >
+                    <ArrowUpWideNarrow className="w-5 h-5" />
+                    Sort History
                   </button>
 
-                  <button className="rounded-2xl border px-8 py-4 flex items-center justify-center gap-4 transition-colors duration-150 bg-white hover:bg-gray-200">
-                    <Egg className="w-5 h-5" />
-                    Egg Defect
+                  <button
+                    onClick={() => setActiveComponent("defect")}
+                    className={`rounded-2xl border px-8 py-4 flex items-center justify-center gap-2 transition-colors duration-150 
+                      ${
+                        activeComponent === "defect"
+                          ? "bg-blue-500 text-white hover:bg-blue-600"
+                          : "bg-white hover:bg-gray-200"
+                      }`}
+                  >
+                    <Bug className="w-5 h-5" />
+                    Defect History
                   </button>
                 </div>
 
-                {/* main content */}
-                <div className="flex flex-col gap-6 bg-white border p-6 rounded-2xl shadow">
-                  asdsa
-                </div>
+                {/* Conditional rendering of components */}
+                {activeComponent === "sort" ? <Sort /> : <Defect />}
               </div>
 
               <Notifications />
