@@ -25,9 +25,36 @@ export async function POST(request) {
 
       const machineData = machineSnap.data()
 
-      // 2. Verify the PIN (we'll assume it's already verified in a separate step)
+      // Check if the machine is already linked to this user
+      const linkedUsers = machineData.linkedUsers || {}
+      if (linkedUsers[userId]) {
+        const linkedAt = linkedUsers[userId].linkedAt
+        // Format the date for display
+        let linkedDate = "unknown date"
+        if (linkedAt) {
+          // If it's a Firestore timestamp, convert to JS Date
+          if (linkedAt.toDate) {
+            linkedDate = linkedAt.toDate().toLocaleString()
+          } else if (linkedAt.seconds) {
+            // Handle Firestore timestamp in JSON format
+            linkedDate = new Date(linkedAt.seconds * 1000).toLocaleString()
+          } else if (typeof linkedAt === "string") {
+            linkedDate = new Date(linkedAt).toLocaleString()
+          }
+        }
 
-      // 3. Verify the link token
+        return Response.json({
+          alreadyLinked: true,
+          message: `This machine is already linked to your account since ${linkedDate}`,
+          machine: {
+            id: machineId,
+            name: machineData.name || "Unknown Machine",
+          },
+          linkedAt: linkedUsers[userId].linkedAt,
+        })
+      }
+
+      // 2. Verify the link token
       const tokenRef = doc(db, "machine_link_tokens", linkToken)
       const tokenSnap = await getDoc(tokenRef)
 
@@ -50,7 +77,7 @@ export async function POST(request) {
         return Response.json({ error: "Token has expired or already been used" }, { status: 400 })
       }
 
-      // 4. Update the machine document to add the user to linkedUsers
+      // 3. Update the machine document to add the user to linkedUsers
       await updateDoc(machineRef, {
         [`linkedUsers.${userId}`]: {
           linkedAt: serverTimestamp(),
@@ -59,7 +86,7 @@ export async function POST(request) {
         updatedAt: serverTimestamp(),
       })
 
-      // 5. Update the user document to add the machine ID
+      // 4. Update the user document to add the machine ID
       const userRef = doc(db, "users", userId)
       const userSnap = await getDoc(userRef)
 
@@ -73,7 +100,7 @@ export async function POST(request) {
         updatedAt: serverTimestamp(),
       })
 
-      // 6. Create a record in machine_users collection
+      // 5. Create a record in machine_users collection
       const linkRef = doc(db, "machine_users", `${machineId}_${userId}`)
       await setDoc(linkRef, {
         machineId,
@@ -82,7 +109,7 @@ export async function POST(request) {
         status: "active",
       })
 
-      // 7. Mark the token as used
+      // 6. Mark the token as used
       await updateDoc(tokenRef, {
         used: true,
         usedAt: serverTimestamp(),
