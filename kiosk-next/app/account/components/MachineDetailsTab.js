@@ -18,8 +18,8 @@ import {
 } from "lucide-react"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
-import { generateLinkToken } from "../../utils/machine-link"
-import { addAccessLog } from "../../utils/logging"
+import { generateLinkToken } from "../utils/machine-link"
+import { addAccessLog } from "../utils/logging"
 
 export default function MachineDetailsTab() {
   const [loading, setLoading] = useState(true)
@@ -472,8 +472,11 @@ export default function MachineDetailsTab() {
                       viewBox={`0 0 256 256`}
                     />
                   </div>
-                  <div className="text-center text-sm text-gray-500">
-                    QR Code expires at: {new Date(qrCodeData.expiresAt).toLocaleTimeString()}
+                  <div className="text-center space-y-1">
+                    <div className="text-sm text-green-600 font-medium">QR Code eligible to link</div>
+                    <div className="text-sm text-gray-500">
+                      Expires at: {new Date(qrCodeData.expiresAt).toLocaleTimeString()}
+                    </div>
                   </div>
                   <div className="flex gap-3">
                     <button

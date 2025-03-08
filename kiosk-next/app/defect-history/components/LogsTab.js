@@ -1,3 +1,4 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\defect-history\components\LogsTab.js
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -15,7 +16,18 @@ import {
   RefreshCcw,
   ChevronDown,
 } from "lucide-react"
-import { collection, query, orderBy, limit, startAfter, getDocs, getCountFromServer } from "firebase/firestore"
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  getCountFromServer,
+  doc,
+  getDoc,
+} from "firebase/firestore"
 import { db } from "../../firebaseConfig"
 // import { addAccessLog } from "../../utils/logging"
 
@@ -77,6 +89,8 @@ export default function LogsTab() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [success, setSuccess] = useState("")
+  const [batchCache, setBatchCache] = useState({}) // Cache for batch data
+  const [batchOptions, setBatchOptions] = useState([]) // List of all batch numbers for the filter dropdown
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -96,39 +110,143 @@ export default function LogsTab() {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await fetch("/api/auth/session")
-        if (!response.ok) {
-          throw new Error("Failed to fetch session")
+        // First verify session
+        const sessionResponse = await fetch("/api/auth/session")
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Session invalid")
         }
-        const data = await response.json()
-        setMachineId(data.machineId)
+
+        if (!sessionData.machineId) {
+          throw new Error("Machine ID not found in session")
+        }
+
+        setMachineId(sessionData.machineId)
+        console.log("Machine ID set:", sessionData.machineId)
       } catch (err) {
         console.error("Error fetching session:", err)
-        setError("Failed to authenticate session")
+        setError("Failed to authenticate session: " + err.message)
       }
     }
 
     fetchSession()
   }, [])
 
-  // Fetch total count
+  // Fetch batch options for dropdown
   useEffect(() => {
-    const fetchTotalCount = async () => {
+    const fetchBatchOptions = async () => {
+      if (!machineId) return
+
       try {
-        const logsRef = collection(db, "defect_logs")
-        const snapshot = await getCountFromServer(logsRef)
-        setTotalItems(snapshot.data().count)
+        const batchesRef = collection(db, "batches")
+        const q = query(batchesRef, where("machine_id", "==", machineId))
+        const snapshot = await getDocs(q)
+
+        const options = []
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          if (data.batch_number) {
+            options.push({
+              id: doc.id,
+              batch_number: data.batch_number,
+            })
+
+            // Update batch cache
+            setBatchCache((prev) => ({
+              ...prev,
+              [doc.id]: data,
+            }))
+          }
+        })
+
+        setBatchOptions(options)
       } catch (err) {
-        console.error("Error fetching total count:", err)
+        console.error("Error fetching batch options:", err)
       }
     }
 
     if (machineId) {
-      fetchTotalCount()
+      fetchBatchOptions()
     }
   }, [machineId])
 
-  // Fetch logs
+  // Function to fetch total count with filters
+  const fetchTotalCount = useCallback(async () => {
+    if (!machineId) return
+
+    try {
+      const logsRef = collection(db, "defect_logs")
+
+      // Start building the query with the machine_id
+      const queryConstraints = [where("machine_id", "==", machineId)]
+
+      // Add filter for defect type
+      if (filters.defectType !== "all") {
+        queryConstraints.push(where("defect_type", "==", filters.defectType))
+      }
+
+      // Add filter for date
+      if (filters.date) {
+        const startDate = new Date(filters.date)
+        startDate.setHours(0, 0, 0, 0)
+
+        const endDate = new Date(filters.date)
+        endDate.setHours(23, 59, 59, 999)
+
+        queryConstraints.push(where("timestamp", ">=", startDate.toISOString()))
+        queryConstraints.push(where("timestamp", "<=", endDate.toISOString()))
+      }
+
+      // Add filter for batch
+      if (filters.batchNumber) {
+        // Find batch ID for the selected batch number
+        const selectedBatch = batchOptions.find((batch) => batch.batch_number === filters.batchNumber)
+        if (selectedBatch) {
+          queryConstraints.push(where("batch_id", "==", selectedBatch.id))
+        }
+      }
+
+      const q = query(logsRef, ...queryConstraints)
+      const snapshot = await getCountFromServer(q)
+      setTotalItems(snapshot.data().count)
+      console.log(`Found ${snapshot.data().count} filtered logs for machine ${machineId}`)
+    } catch (err) {
+      console.error("Error fetching total count:", err)
+      setError("Failed to count logs: " + err.message)
+    }
+  }, [machineId, filters, batchOptions])
+
+  // Function to fetch batch data
+  const fetchBatchData = async (batchId) => {
+    // Check if we already have this batch in cache
+    if (batchCache[batchId]) {
+      return batchCache[batchId]
+    }
+
+    try {
+      const batchRef = doc(db, "batches", batchId)
+      const batchSnap = await getDoc(batchRef)
+
+      if (batchSnap.exists()) {
+        const batchData = batchSnap.data()
+        // Update cache
+        setBatchCache((prev) => ({
+          ...prev,
+          [batchId]: batchData,
+        }))
+        return batchData
+      } else {
+        console.log(`No batch found with ID: ${batchId}`)
+        return { batch_number: "Unknown" }
+      }
+    } catch (err) {
+      console.error(`Error fetching batch ${batchId}:`, err)
+      return { batch_number: "Error" }
+    }
+  }
+
+  // Fetch logs with filters
   const fetchLogs = useCallback(
     async (pageNumber, lastDoc = null) => {
       if (!machineId) {
@@ -139,20 +257,71 @@ export default function LogsTab() {
       try {
         setLoading(true)
         setError(null)
-        console.log("Fetching logs for page:", pageNumber)
+        console.log("Fetching logs for page:", pageNumber, "for machine:", machineId, "with filters:", filters)
 
         const logsRef = collection(db, "defect_logs")
-        let q = query(logsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE))
 
-        if (lastDoc && pageNumber > 1) {
-          q = query(logsRef, orderBy("timestamp", "desc"), startAfter(lastDoc), limit(ITEMS_PER_PAGE))
+        // Start building the query with machine_id
+        const queryConstraints = [where("machine_id", "==", machineId)]
+
+        // Add filter for defect type
+        if (filters.defectType !== "all") {
+          queryConstraints.push(where("defect_type", "==", filters.defectType))
         }
+
+        // Add filter for date
+        if (filters.date) {
+          const startDate = new Date(filters.date)
+          startDate.setHours(0, 0, 0, 0)
+
+          const endDate = new Date(filters.date)
+          endDate.setHours(23, 59, 59, 999)
+
+          queryConstraints.push(where("timestamp", ">=", startDate.toISOString()))
+          queryConstraints.push(where("timestamp", "<=", endDate.toISOString()))
+        }
+
+        // Add filter for batch
+        if (filters.batchNumber) {
+          // Find batch ID for the selected batch number
+          const selectedBatch = batchOptions.find((batch) => batch.batch_number === filters.batchNumber)
+          if (selectedBatch) {
+            queryConstraints.push(where("batch_id", "==", selectedBatch.id))
+          }
+        }
+
+        // Add sorting
+        queryConstraints.push(orderBy("timestamp", filters.sortBy === "newest" ? "desc" : "asc"))
+
+        // Add pagination
+        if (lastDoc && pageNumber > 1) {
+          queryConstraints.push(startAfter(lastDoc))
+        }
+
+        queryConstraints.push(limit(ITEMS_PER_PAGE))
+
+        // Build the final query
+        const q = query(logsRef, ...queryConstraints)
 
         const querySnapshot = await getDocs(q)
         const fetchedLogs = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }))
+
+        // Fetch batch data for each log
+        const logsWithBatchData = await Promise.all(
+          fetchedLogs.map(async (log) => {
+            if (log.batch_id) {
+              const batchData = await fetchBatchData(log.batch_id)
+              return {
+                ...log,
+                batch_number: batchData.batch_number || "Unknown",
+              }
+            }
+            return log
+          }),
+        )
 
         // Update last visible document for next pagination
         const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
@@ -161,14 +330,15 @@ export default function LogsTab() {
         // Check if we have more pages
         setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE)
 
-        setLogs(fetchedLogs)
+        setLogs(logsWithBatchData)
+        console.log(`Fetched ${logsWithBatchData.length} logs for machine ${machineId}`)
 
         // Log successful fetch
         // await addAccessLog(
         //   {
         //     action: "view_logs",
         //     status: "success",
-        //     details: `Fetched ${fetchedLogs.length} logs`,
+        //     details: `Fetched ${logsWithBatchData.length} logs`,
         //   },
         //   machineId,
         // )
@@ -176,7 +346,7 @@ export default function LogsTab() {
         setSuccess("Logs loaded successfully")
       } catch (err) {
         console.error("Error fetching logs:", err)
-        setError("Failed to load logs. Please try again later.")
+        setError("Failed to load logs: " + err.message)
 
         // Log error
         // await addAccessLog(
@@ -192,8 +362,15 @@ export default function LogsTab() {
         setLoading(false)
       }
     },
-    [machineId],
+    [machineId, filters, batchOptions],
   )
+
+  // Update total count when filters change
+  useEffect(() => {
+    if (machineId) {
+      fetchTotalCount()
+    }
+  }, [fetchTotalCount, machineId])
 
   // Initial fetch
   useEffect(() => {
@@ -214,29 +391,12 @@ export default function LogsTab() {
     }
   }
 
-  // Update the filteredLogs logic to use all filters
-  const filteredLogs = logs
-    .filter((log) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        log.batch_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.defect_type.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesType =
-        filters.defectType === "all" || log.defect_type.toLowerCase() === filters.defectType.toLowerCase()
-
-      const matchesDate = !filters.date || new Date(log.timestamp).toISOString().split("T")[0] === filters.date
-
-      const matchesBatch = !filters.batchNumber || log.batch_number === filters.batchNumber
-
-      return matchesSearch && matchesType && matchesDate && matchesBatch
-    })
-    .sort((a, b) => {
-      if (filters.sortBy === "newest") {
-        return new Date(b.timestamp) - new Date(a.timestamp)
-      }
-      return new Date(a.timestamp) - new Date(b.timestamp)
-    })
+  // Function to handle search apply
+  const handleApplySearch = () => {
+    setCurrentPage(1)
+    setLastVisible(null)
+    fetchLogs(1)
+  }
 
   // Export to CSV
   const handleExport = async () => {
@@ -248,9 +408,9 @@ export default function LogsTab() {
     try {
       const csvContent = [
         ["Timestamp", "Batch Number", "Defect Type", "Confidence Score"],
-        ...filteredLogs.map((log) => [
+        ...logs.map((log) => [
           new Date(log.timestamp).toLocaleString(),
-          log.batch_number,
+          log.batch_number || "Unknown",
           log.defect_type,
           (log.confidence_score * 100).toFixed(1) + "%",
         ]),
@@ -273,7 +433,7 @@ export default function LogsTab() {
       //   {
       //     action: "export_logs",
       //     status: "success",
-      //     details: `Exported ${filteredLogs.length} logs`,
+      //     details: `Exported ${logs.length} logs`,
       //   },
       //   machineId,
       // )
@@ -308,7 +468,11 @@ export default function LogsTab() {
           <p className="text-gray-500">View and analyze inspection results</p>
         </div>
         <button
-          onClick={() => fetchLogs(currentPage)}
+          onClick={() => {
+            setCurrentPage(1)
+            setLastVisible(null)
+            fetchLogs(1)
+          }}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           title="Refresh logs"
         >
@@ -333,11 +497,18 @@ export default function LogsTab() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by batch number or defect type..."
+              placeholder="Search by defect type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleApplySearch()}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e5f97]"
             />
+            <button
+              onClick={handleApplySearch}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-2 py-1 bg-[#0e5f97] text-white text-xs rounded hover:bg-[#0e4772]"
+            >
+              Search
+            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -365,7 +536,11 @@ export default function LogsTab() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Defect Type</label>
               <select
                 value={filters.defectType}
-                onChange={(e) => setFilters((prev) => ({ ...prev, defectType: e.target.value }))}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, defectType: e.target.value }))
+                  setCurrentPage(1)
+                  setLastVisible(null)
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               >
                 <option value="all">All Types</option>
@@ -380,7 +555,11 @@ export default function LogsTab() {
               <input
                 type="date"
                 value={filters.date}
-                onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, date: e.target.value }))
+                  setCurrentPage(1)
+                  setLastVisible(null)
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               />
             </div>
@@ -388,13 +567,17 @@ export default function LogsTab() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
               <select
                 value={filters.batchNumber}
-                onChange={(e) => setFilters((prev) => ({ ...prev, batchNumber: e.target.value }))}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, batchNumber: e.target.value }))
+                  setCurrentPage(1)
+                  setLastVisible(null)
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               >
                 <option value="">All Batches</option>
-                {[...new Set(logs.map((log) => log.batch_number))].map((batch) => (
-                  <option key={batch} value={batch}>
-                    {batch}
+                {batchOptions.map((batch) => (
+                  <option key={batch.id} value={batch.batch_number}>
+                    {batch.batch_number}
                   </option>
                 ))}
               </select>
@@ -403,7 +586,11 @@ export default function LogsTab() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
               <select
                 value={filters.sortBy}
-                onChange={(e) => setFilters((prev) => ({ ...prev, sortBy: e.target.value }))}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, sortBy: e.target.value }))
+                  setCurrentPage(1)
+                  setLastVisible(null)
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               >
                 <option value="newest">Newest First</option>
@@ -456,14 +643,14 @@ export default function LogsTab() {
                     </div>
                   </td>
                 </tr>
-              ) : filteredLogs.length === 0 ? (
+              ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                     No logs found matching your criteria
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => {
+                logs.map((log) => {
                   const style = getDefectStyle(log.defect_type)
                   return (
                     <tr key={log.id} className="hover:bg-gray-50 transition-colors">
@@ -473,7 +660,7 @@ export default function LogsTab() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 text-xs font-medium">
-                          {log.batch_number}
+                          {log.batch_number || "Unknown"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -530,7 +717,7 @@ export default function LogsTab() {
       {/* Pagination */}
       <div className="flex items-center justify-between px-2">
         <div className="text-sm text-gray-500">
-          Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalItems)}-
+          Showing {totalItems > 0 ? Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalItems) : 0}-
           {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
         </div>
         <div className="flex items-center gap-2">
@@ -548,7 +735,7 @@ export default function LogsTab() {
           </button>
 
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, Math.ceil(totalItems / ITEMS_PER_PAGE)) }, (_, i) => {
+            {Array.from({ length: Math.min(5, Math.ceil(totalItems / ITEMS_PER_PAGE) || 1) }, (_, i) => {
               const pageNumber = i + 1
               return (
                 <button

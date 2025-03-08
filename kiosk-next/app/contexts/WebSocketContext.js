@@ -1,17 +1,17 @@
 //D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\contexts\WebSocketContext.js
-
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react"
 
 const WS_URL = "ws://localhost:8000/ws"
-const PING_INTERVAL = 60000 
+const PING_INTERVAL = 60000
 
 const WebSocketContext = createContext(null)
 
 const logger = {
   log: (message) => {
-    console.log(`[WebSocketContext] ${new Date().toISOString()}: ${message}`)
+    // Comment out regular logs to reduce console noise
+    // console.log(`[WebSocketContext] ${new Date().toISOString()}: ${message}`)
   },
   warn: (message) => {
     console.warn(`[WebSocketContext] ${new Date().toISOString()}: ${message}`)
@@ -37,7 +37,6 @@ export const WebSocketProvider = ({ children }) => {
   const pingIntervalRef = useRef(null)
   const messageIdCounter = useRef(0)
 
-
   const startPing = useCallback(() => {
     if (pingIntervalRef.current) {
       clearInterval(pingIntervalRef.current)
@@ -45,7 +44,7 @@ export const WebSocketProvider = ({ children }) => {
     pingIntervalRef.current = setInterval(() => {
       if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify({ action: "ping" }))
-        logger.log("Ping sent to server")
+        // Removed ping log to reduce console noise
       }
     }, PING_INTERVAL)
   }, [])
@@ -54,17 +53,17 @@ export const WebSocketProvider = ({ children }) => {
     if (pingIntervalRef.current) {
       clearInterval(pingIntervalRef.current)
       pingIntervalRef.current = null
-      logger.log("Ping interval cleared")
+      // Removed log
     }
   }, [])
 
   const connectWebSocket = useCallback(() => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      logger.log("WebSocket is already connected")
+      // Removed log
       return
     }
 
-    logger.log("Attempting to connect WebSocket...")
+    // Removed log
     ws.current = new WebSocket(WS_URL)
 
     ws.current.onerror = (error) => {
@@ -73,17 +72,17 @@ export const WebSocketProvider = ({ children }) => {
     }
 
     ws.current.onopen = () => {
-      logger.log("WebSocket connected")
+      // Removed log
       setReadyState(WebSocket.OPEN)
       startPing()
     }
 
     ws.current.onmessage = (event) => {
-      logger.log(`Received message from WebSocket: ${event.data}`)
+      // Removed log for all messages
       try {
         const data = JSON.parse(event.data)
         if (data.action === "pong") {
-          logger.log("Received pong from server")
+          // Removed pong log
           return
         }
         // Add a unique ID to the message
@@ -107,7 +106,7 @@ export const WebSocketProvider = ({ children }) => {
 
     return () => {
       if (ws.current) {
-        logger.log("Cleaning up WebSocket connection")
+        // Removed log
         ws.current.close()
       }
       stopPing()
@@ -117,7 +116,7 @@ export const WebSocketProvider = ({ children }) => {
   const sendMessage = useCallback((message) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message))
-      logger.log(`Message sent to WebSocket: ${JSON.stringify(message)}`)
+      // Removed log
     } else {
       logger.error("WebSocket is not connected. Message not sent.")
     }
@@ -127,3 +126,4 @@ export const WebSocketProvider = ({ children }) => {
     <WebSocketContext.Provider value={{ sendMessage, lastMessage, readyState }}>{children}</WebSocketContext.Provider>
   )
 }
+
