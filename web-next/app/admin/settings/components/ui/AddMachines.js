@@ -1,7 +1,6 @@
-// D:\4TH YEAR\CAPSTONE\MEGG\web-next\app\admin\settings\components\ui\AddMachines.js
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Camera,
   X,
@@ -17,6 +16,7 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Upload,
 } from "lucide-react"
 import { Html5Qrcode } from "html5-qrcode"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
@@ -36,6 +36,8 @@ export default function AddMachines() {
   const [pinError, setPinError] = useState("")
   const [showPin, setShowPin] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
+  const [processingUpload, setProcessingUpload] = useState(false)
+  const fileInputRef = useRef(null)
 
   // Get current user from Firebase
   useEffect(() => {
@@ -318,6 +320,58 @@ export default function AddMachines() {
     setShowPin(!showPin)
   }
 
+  // Handle file upload button click
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  // Process the uploaded QR code image
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setProcessingUpload(true)
+      setGlobalMessage("Processing QR code image...")
+
+      const html5QrCode = new Html5Qrcode("qr-reader-hidden")
+
+      // Create a file URL
+      const fileUrl = URL.createObjectURL(file)
+
+      // Decode the QR code from the image
+      const decodedText = await html5QrCode.scanFile(file, /* showImage */ false)
+
+      // Clean up
+      URL.revokeObjectURL(fileUrl)
+      html5QrCode.clear()
+
+      // Process the decoded text
+      try {
+        const machineData = JSON.parse(decodedText)
+        setFormData((prev) => ({
+          ...prev,
+          machineCode: decodedText,
+        }))
+        setScannedMachine(machineData)
+        setGlobalMessage("QR Code uploaded and processed successfully!")
+      } catch (error) {
+        console.error("Error parsing QR code:", error)
+        setGlobalMessage("Invalid QR code format. Please upload a valid machine QR code.")
+      }
+    } catch (error) {
+      console.error("Error processing QR code image:", error)
+      setGlobalMessage("Could not read QR code from image. Please try another image or use the camera scanner.")
+    } finally {
+      setProcessingUpload(false)
+      setTimeout(() => {
+        if (globalMessage.includes("successfully")) {
+          setGlobalMessage("")
+        }
+      }, 3000)
+    }
+  }
+
   return (
     <>
       {/* Use onSubmit to prevent default form submission */}
@@ -361,18 +415,51 @@ export default function AddMachines() {
                   <div className="flex justify-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                     <div className="text-center">
                       <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 mb-4">Scan a QR code to link a machine</p>
-                      <button
-                        type="button"
-                        onClick={() => setIsCameraOpen(true)}
-                        className="px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors duration-150 bg-blue-500 hover:bg-blue-600 text-white mx-auto"
-                        disabled={!currentUser}
-                      >
-                        <Camera className="w-5 h-5" />
-                        Scan QR Code
-                      </button>
+                      <p className="text-gray-600 mb-4">Scan or upload a QR code to link a machine</p>
+
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setIsCameraOpen(true)}
+                          className="px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors duration-150 bg-blue-500 hover:bg-blue-600 text-white"
+                          disabled={!currentUser || processingUpload}
+                        >
+                          <Camera className="w-5 h-5" />
+                          Scan QR Code
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleUploadClick}
+                          className="px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors duration-150 border border-blue-500 text-blue-500 hover:bg-blue-50"
+                          disabled={!currentUser || processingUpload}
+                        >
+                          <Upload className="w-5 h-5" />
+                          Upload QR Image
+                        </button>
+
+                        {/* Hidden file input */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          disabled={!currentUser || processingUpload}
+                        />
+                      </div>
+
+                      {processingUpload && (
+                        <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Processing image...</span>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Hidden element for QR code processing */}
+                  <div id="qr-reader-hidden" className="hidden"></div>
                 </div>
               ) : (
                 <>

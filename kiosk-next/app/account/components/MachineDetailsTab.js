@@ -15,10 +15,12 @@ import {
   Link,
   Download,
   RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
-import { doc, updateDoc } from "firebase/firestore"
+import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
-import { generateLinkToken } from "../utils/machine-link"
+import { generateLinkToken, initializeMachineLink } from "../utils/machine-link"
 import { addAccessLog } from "../utils/logging"
 
 export default function MachineDetailsTab() {
@@ -86,6 +88,17 @@ export default function MachineDetailsTab() {
 
         setMachineDetails(machineData.machine)
         setEditedDetails(machineData.machine)
+
+        // Initialize machine link status listener
+        const unsubscribe = initializeMachineLink(sessionData.machineId, (status) => {
+          console.log("Link status updated:", status)
+          setLinkStatus(status)
+        })
+
+        // Return cleanup function
+        return () => {
+          if (unsubscribe) unsubscribe()
+        }
       } catch (error) {
         console.error("Error fetching data:", error)
       } finally {
@@ -95,6 +108,57 @@ export default function MachineDetailsTab() {
 
     fetchData()
   }, [])
+
+  // Fetch link status directly if not available through listener
+  useEffect(() => {
+    const fetchLinkStatus = async () => {
+      if (machineId && !linkStatus.isLinked) {
+        try {
+          const machineRef = doc(db, "machines", machineId)
+          const machineSnap = await getDoc(machineRef)
+
+          if (machineSnap.exists()) {
+            const data = machineSnap.data()
+            const linkedUsers = data.linkedUsers || {}
+            const isLinked = Object.keys(linkedUsers).length > 0
+
+            if (isLinked) {
+              // Get the first linked user (or you could get all of them)
+              const userId = Object.keys(linkedUsers)[0]
+              const userInfo = linkedUsers[userId]
+
+              // Fetch user details if needed
+              let userData = { fullname: "Unknown User", email: "unknown@example.com" }
+
+              try {
+                const userRef = doc(db, "users", userId)
+                const userSnap = await getDoc(userRef)
+                if (userSnap.exists()) {
+                  userData = userSnap.data()
+                }
+              } catch (error) {
+                console.error("Error fetching user data:", error)
+              }
+
+              setLinkStatus({
+                isLinked: true,
+                linkedUser: {
+                  uid: userId,
+                  name: userData.fullname || userData.displayName || "Unknown User",
+                  email: userData.email || "unknown@example.com",
+                },
+                linkTime: userInfo.linkedAt,
+              })
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching link status:", error)
+        }
+      }
+    }
+
+    fetchLinkStatus()
+  }, [machineId, linkStatus.isLinked])
 
   const handleEdit = () => {
     setIsEditing(true)
@@ -175,6 +239,29 @@ export default function MachineDetailsTab() {
     }
   }
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not available"
+
+    try {
+      // Handle Firestore timestamp objects
+      if (typeof dateString === "object" && dateString.toDate) {
+        return dateString.toDate().toLocaleString()
+      }
+
+      // Handle Firestore timestamp in JSON format
+      if (typeof dateString === "object" && dateString.seconds) {
+        return new Date(dateString.seconds * 1000).toLocaleString()
+      }
+
+      // Handle regular date strings
+      return new Date(dateString).toLocaleString()
+    } catch (e) {
+      console.error("Error formatting date:", e)
+      return "Invalid date"
+    }
+  }
+
   if (loading) {
     return (
       <div className="w-full">
@@ -227,7 +314,7 @@ export default function MachineDetailsTab() {
               </h3>
               <div className="space-y-4">
                 <div className="grid gap-4">
-                  {["Owner Name", "Email Address", "Linked Since", "Account Type"].map((label) => (
+                  {["Owner Name", "Email Address", "Linked Since"].map((label) => (
                     <div key={label} className="space-y-1">
                       <p className="text-sm text-gray-500">{label}</p>
                       <div className="h-6 w-full rounded-lg animate-shimmer" />
@@ -264,20 +351,10 @@ export default function MachineDetailsTab() {
             {/* Link Status */}
             <div className="bg-white rounded-xl border p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-[#0e4772] flex items-center gap-2 mb-4">
-                <Shield className="w-5 h-5" />
+                <Link className="w-5 h-5" />
                 Connection Status
               </h3>
-              <div className="space-y-4">
-                <div className="h-10 w-full rounded-lg animate-shimmer" />
-                <div className="space-y-3">
-                  {["Linked User", "Email", "Connected Since"].map((label) => (
-                    <div key={label}>
-                      <p className="text-sm text-gray-500">{label}</p>
-                      <div className="h-6 w-full rounded-lg animate-shimmer mt-1" />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div className="h-10 w-full rounded-lg animate-shimmer" />
             </div>
           </div>
         </div>
@@ -398,7 +475,6 @@ export default function MachineDetailsTab() {
             )}
           </div>
 
-          {/* Statistics Summary */}
           {/* Owner Details */}
           <div className="bg-white rounded-xl border p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-[#0e4772] flex items-center gap-2 mb-4">
@@ -423,15 +499,7 @@ export default function MachineDetailsTab() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Linked Since</p>
-                    <p className="font-medium text-gray-900">
-                      {linkStatus.linkTime ? new Date(linkStatus.linkTime).toLocaleString() : "Not available"}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-500">Account Type</p>
-                    <p className="font-medium text-gray-900">
-                      {linkStatus.linkedUser?.accountType || "Standard Account"}
-                    </p>
+                    <p className="font-medium text-gray-900">{formatDate(linkStatus.linkTime)}</p>
                   </div>
                 </div>
               </div>
@@ -460,7 +528,17 @@ export default function MachineDetailsTab() {
             </div>
 
             <div className="flex flex-col items-center gap-6">
-              {qrCodeData ? (
+              {linkStatus.isLinked ? (
+                <div className="text-center py-8">
+                  <div className="mb-4">
+                    <QrCode className="w-16 h-16 text-gray-300 mx-auto" />
+                  </div>
+                  <h4 className="text-gray-600 font-medium mb-2">Machine Already Linked</h4>
+                  <p className="text-sm text-gray-500 max-w-md mx-auto">
+                    This machine is already linked to an account. QR code generation is disabled.
+                  </p>
+                </div>
+              ) : qrCodeData ? (
                 <>
                   <div className="bg-white p-6 rounded-xl border shadow-sm">
                     <QRCode
@@ -510,45 +588,65 @@ export default function MachineDetailsTab() {
             </div>
           </div>
 
-          {/* Link Status */}
-          <div className="bg-white rounded-xl border p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-[#0e4772] flex items-center gap-2 mb-4">
-              <Link className="w-5 h-5" />
-              Connection Status
-            </h3>
+          {/* Creative Connection Status */}
+          <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
+            {/* Header with gradient background */}
+            <div className="bg-gradient-to-r from-[#0e4772] to-[#0e5f97] px-6 py-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Link className="w-5 h-5" />
+                Connection Status
+              </h3>
+            </div>
 
-            {linkStatus.isLinked ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
-                  <Shield className="w-4 h-4" />
-                  <span className="text-sm font-medium">Connected</span>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-gray-500">Linked User</p>
-                    <p className="font-medium">{linkStatus.linkedUser?.name}</p>
+            {/* Connection visualization */}
+            <div className="p-6">
+              {linkStatus.isLinked ? (
+                <div className="flex flex-col items-center">
+                  {/* Connected visualization */}
+                  <div className="relative mb-6">
+                    <div className="relative z-10 bg-gradient-to-br from-green-400 to-green-600 text-white p-6 rounded-full">
+                      <Wifi className="w-12 h-12" />
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{linkStatus.linkedUser?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Connected Since</p>
-                    <p className="font-medium">
-                      {linkStatus.linkTime && new Date(linkStatus.linkTime).toLocaleString()}
+
+                  {/* Connection details */}
+                  <div className="text-center">
+                    <h4 className="text-xl font-bold text-green-600 mb-2">Connected</h4>
+                    <p className="text-gray-600">
+                      This machine is linked to{" "}
+                      <span className="font-semibold">{linkStatus.linkedUser?.name || "a user"}</span>
                     </p>
+                    <div className="mt-4 inline-block bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm">
+                      Active connection since {formatDate(linkStatus.linkTime)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <div className="mb-4">
-                  <Link className="w-12 h-12 text-gray-400 mx-auto" />
+              ) : (
+                <div className="flex flex-col items-center">
+                  {/* Disconnected visualization */}
+                  <div className="mb-6 bg-gray-200 p-6 rounded-full">
+                    <WifiOff className="w-12 h-12 text-gray-400" />
+                  </div>
+
+                  {/* Disconnected message */}
+                  <div className="text-center">
+                    <h4 className="text-xl font-bold text-gray-500 mb-2">Not Connected</h4>
+                    <p className="text-gray-600 mb-4">This machine is not linked to any user account</p>
+
+                    {/* Steps to connect */}
+                    <div className="bg-blue-50 rounded-lg p-4 text-left">
+                      <h5 className="font-medium text-blue-700 mb-2">How to connect:</h5>
+                      <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
+                        <li>Generate a QR code above</li>
+                        <li>Open the web app on your device</li>
+                        <li>Scan the QR code with the app</li>
+                        <li>Enter the machine PIN when prompted</li>
+                      </ol>
+                    </div>
+                  </div>
                 </div>
-                <h4 className="text-gray-600 font-medium mb-2">Not Connected</h4>
-                <p className="text-sm text-gray-500">Scan the QR code above to link this machine to your web account</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

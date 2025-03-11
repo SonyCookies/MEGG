@@ -1,7 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Shield, Lock, AlertTriangle, CheckCircle2, X, Unlink, Clock } from "lucide-react"
+import {
+  Shield,
+  Lock,
+  AlertTriangle,
+  CheckCircle2,
+  X,
+  Unlink,
+  Clock,
+  User,
+  Mail,
+  Calendar,
+  Eye,
+  EyeOff,
+} from "lucide-react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
 import { addAccessLog } from "../../utils/logging"
@@ -32,6 +45,11 @@ export default function SecuritySettingsTab() {
     isLinked: false,
     linkedUsers: null,
   })
+  const [ownerDetails, setOwnerDetails] = useState(null)
+  const [pinInput, setPinInput] = useState("")
+  const [pinError, setPinError] = useState("")
+  const [showPin, setShowPin] = useState(false)
+  const [verifyingPin, setVerifyingPin] = useState(false)
 
   const { handleLogout } = useAutoLogout(settings.autoLogout.enabled, settings.autoLogout.timeout)
 
@@ -67,6 +85,38 @@ export default function SecuritySettingsTab() {
             isLinked: Object.keys(linkedUsers).length > 0,
             linkedUsers,
           })
+
+          // Fetch owner details if machine is linked
+          if (Object.keys(linkedUsers).length > 0) {
+            const userId = Object.keys(linkedUsers)[0]
+            const userInfo = linkedUsers[userId]
+
+            try {
+              const userRef = doc(db, "users", userId)
+              const userDoc = await getDoc(userRef)
+
+              if (userDoc.exists()) {
+                const userData = userDoc.data()
+                setOwnerDetails({
+                  uid: userId,
+                  fullname: userData.fullname || userData.displayName || "Unknown User",
+                  email: userData.email || "No email provided",
+                  linkedAt: userInfo.linkedAt,
+                  isActive: userInfo.isActive || true,
+                })
+              } else {
+                setOwnerDetails({
+                  uid: userId,
+                  fullname: userInfo.name || "Unknown User",
+                  email: userInfo.email || "No email provided",
+                  linkedAt: userInfo.linkedAt,
+                  isActive: userInfo.isActive || true,
+                })
+              }
+            } catch (err) {
+              console.error("Error fetching user details:", err)
+            }
+          }
         }
       } catch (err) {
         console.error("Error fetching security settings:", err)
@@ -127,7 +177,61 @@ export default function SecuritySettingsTab() {
     }
   }
 
+  const verifyPin = async () => {
+    if (!pinInput.trim()) {
+      setPinError("Please enter the machine PIN")
+      return false
+    }
+
+    try {
+      setVerifyingPin(true)
+      setPinError("")
+
+      // Make an API call to verify the PIN - UPDATED PATH HERE
+      const verifyResponse = await fetch("/api/auth/verify-pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          machineId: machineId,
+          pin: pinInput,
+        }),
+      })
+
+      // Check if response is JSON
+      const contentType = verifyResponse.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Non-JSON response:", await verifyResponse.text())
+        setPinError("Server returned an invalid response. Please try again.")
+        return false
+      }
+
+      const responseData = await verifyResponse.json()
+
+      if (!verifyResponse.ok) {
+        setPinError(responseData.error || "Invalid PIN. Please try again.")
+        return false
+      }
+
+      // PIN verified successfully
+      return true
+    } catch (error) {
+      console.error("Error verifying PIN:", error)
+      setPinError("Error connecting to server. Please try again.")
+      return false
+    } finally {
+      setVerifyingPin(false)
+    }
+  }
+
   const handleUnlinkMachine = async () => {
+    // First verify PIN
+    const isPinValid = await verifyPin()
+    if (!isPinValid) {
+      return
+    }
+
     try {
       setSaving(true)
       setError("")
@@ -153,15 +257,45 @@ export default function SecuritySettingsTab() {
         isLinked: false,
         linkedUsers: null,
       })
+      setOwnerDetails(null)
 
       setSuccess("Machine successfully unlinked")
       setShowUnlinkDialog(false)
+      setPinInput("")
     } catch (err) {
       console.error("Error unlinking machine:", err)
       setError("Failed to unlink machine")
     } finally {
       setSaving(false)
     }
+  }
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not available"
+
+    try {
+      // Handle Firestore timestamp objects
+      if (typeof dateString === "object" && dateString.toDate) {
+        return dateString.toDate().toLocaleString()
+      }
+
+      // Handle Firestore timestamp in JSON format
+      if (typeof dateString === "object" && dateString.seconds) {
+        return new Date(dateString.seconds * 1000).toLocaleString()
+      }
+
+      // Handle regular date strings
+      return new Date(dateString).toLocaleString()
+    } catch (e) {
+      console.error("Error formatting date:", e)
+      return "Invalid date"
+    }
+  }
+
+  // Toggle PIN visibility
+  const togglePinVisibility = () => {
+    setShowPin(!showPin)
   }
 
   if (loading) {
@@ -304,20 +438,37 @@ export default function SecuritySettingsTab() {
                 <span className="text-sm font-medium">Machine Linked</span>
               </div>
 
-              <div className="space-y-4">
-                {Object.entries(linkStatus.linkedUsers).map(([userId, userData]) => (
-                  <div key={userId} className="space-y-1">
-                    <p className="text-sm text-gray-500">Linked User</p>
-                    <p className="font-medium text-gray-900">{userData.name || "Unknown"}</p>
-                    <p className="text-sm text-gray-500">{userData.email || "No email provided"}</p>
-                    {userData.linkedAt && (
-                      <p className="text-sm text-gray-500">
-                        Linked on {new Date(userData.linkedAt).toLocaleDateString()}
-                      </p>
-                    )}
+              {ownerDetails && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-base font-medium text-gray-900 mb-4">Owner Details</h4>
+
+                  <div className="grid gap-4">
+                    <div className="flex items-start gap-3">
+                      <User className="w-5 h-5 text-[#0e5f97] mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Full Name</p>
+                        <p className="text-base">{ownerDetails.fullname}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <Mail className="w-5 h-5 text-[#0e5f97] mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Email Address</p>
+                        <p className="text-base">{ownerDetails.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <Calendar className="w-5 h-5 text-[#0e5f97] mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Linked Since</p>
+                        <p className="text-base">{formatDate(ownerDetails.linkedAt)}</p>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
 
               <button
                 onClick={() => setShowUnlinkDialog(true)}
@@ -340,6 +491,8 @@ export default function SecuritySettingsTab() {
           )}
         </div>
       </div>
+
+      {/* Unlink Confirmation Dialog with PIN Verification */}
       {showUnlinkDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -347,26 +500,66 @@ export default function SecuritySettingsTab() {
               <Unlink className="w-5 h-5" />
               Unlink Machine
             </h3>
-            <p className="mt-2 text-sm text-gray-500">Are you sure you want to unlink this machine? This will:</p>
-            <ul className="mt-2 space-y-1 text-sm text-gray-500 list-disc list-inside">
+            <p className="mt-2 text-sm text-gray-500">
+              Are you sure you want to unlink this machine from {ownerDetails?.fullname || "the current user"}?
+            </p>
+
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                This action requires verification. Please enter your machine PIN to confirm.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <label htmlFor="pin" className="block text-sm font-medium text-gray-700 mb-1">
+                Machine PIN
+              </label>
+              <div className="relative">
+                <input
+                  type={showPin ? "text" : "password"}
+                  id="pin"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Enter machine PIN"
+                  className={`w-full px-4 py-2 pr-10 border rounded-lg ${
+                    pinError ? "border-red-300 bg-red-50" : "border-gray-300"
+                  } focus:outline-none focus:ring-2 focus:ring-[#0e5f97]`}
+                />
+                <button
+                  type="button"
+                  onClick={togglePinVisibility}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                >
+                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {pinError && <p className="mt-1 text-sm text-red-600">{pinError}</p>}
+            </div>
+
+            <ul className="mt-4 space-y-1 text-sm text-gray-500 list-disc list-inside">
               <li>Remove all web account connections</li>
               <li>Require re-linking via QR code to reconnect</li>
               <li>Not affect local PIN access</li>
             </ul>
+
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => setShowUnlinkDialog(false)}
-                disabled={saving}
+                onClick={() => {
+                  setShowUnlinkDialog(false)
+                  setPinInput("")
+                  setPinError("")
+                }}
+                disabled={saving || verifyingPin}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUnlinkMachine}
-                disabled={saving}
+                disabled={saving || verifyingPin || !pinInput.trim()}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {saving ? "Unlinking..." : "Unlink Machine"}
+                {verifyingPin ? "Verifying..." : saving ? "Unlinking..." : "Unlink Machine"}
               </button>
             </div>
           </div>
