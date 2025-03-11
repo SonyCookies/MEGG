@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\api\auth\verify-pin\route.ts
+
 import { NextResponse } from "next/server"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "../../../firebaseConfig"
