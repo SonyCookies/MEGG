@@ -1,38 +1,52 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getDefectDistribution } from "../../../../lib/api"
 
 export function EggDefectDonutChart() {
   const [animationProgress, setAnimationProgress] = useState(0)
   const [hoverSegment, setHoverSegment] = useState(null)
+  const [segments, setSegments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    const animationDuration = 1000
-    const startTime = Date.now()
-
-    const animateChart = () => {
-      const elapsedTime = Date.now() - startTime
-      const progress = Math.min(elapsedTime / animationDuration, 1)
-      setAnimationProgress(progress)
-
-      if (progress < 1) {
-        requestAnimationFrame(animateChart)
+    const fetchData = async () => {
+      try {
+        const data = await getDefectDistribution()
+        setSegments(data)
+        setLoading(false)
+      } catch (err) {
+        console.error("Error fetching defect distribution:", err)
+        setError("Failed to load defect distribution data")
+        setLoading(false)
       }
     }
 
-    requestAnimationFrame(animateChart)
+    fetchData()
   }, [])
+
+  useEffect(() => {
+    if (segments.length > 0) {
+      const animationDuration = 1000
+      const startTime = Date.now()
+
+      const animateChart = () => {
+        const elapsedTime = Date.now() - startTime
+        const progress = Math.min(elapsedTime / animationDuration, 1)
+        setAnimationProgress(progress)
+
+        if (progress < 1) {
+          requestAnimationFrame(animateChart)
+        }
+      }
+
+      requestAnimationFrame(animateChart)
+    }
+  }, [segments])
 
   const circleRadius = 40
   const circumference = 2 * Math.PI * circleRadius
-
-  const segments = [
-    { name: "Cracks", color: "#0e5f97", percentage: 40, count: 400000, offset: 0 },
-    { name: "Dirt", color: "#0e4772", percentage: 25, count: 250000, offset: 100.48 },
-    { name: "Deformities", color: "#b0b0b0", percentage: 20, count: 200000, offset: 163.28 },
-    { name: "Blood Spots", color: "#fb510f", percentage: 10, count: 100000, offset: 213.52 },
-    { name: "Other", color: "#ecb662", percentage: 5, count: 50000, offset: 238.64 },
-  ]
 
   const handleMouseEnter = (segment) => {
     setHoverSegment(segment)
@@ -40,6 +54,22 @@ export function EggDefectDonutChart() {
 
   const handleMouseLeave = () => {
     setHoverSegment(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="relative h-full w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="relative h-full w-full flex items-center justify-center">
+        <div className="text-red-500">{error}</div>
+      </div>
+    )
   }
 
   return (

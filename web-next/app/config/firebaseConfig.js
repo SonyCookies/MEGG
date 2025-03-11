@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app"
 import { getAuth } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
+import { getFirestore, collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
+
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,4 +23,5 @@ auth.settings.appVerificationDisabledForTesting = false // Ensure this is false 
 
 // export const auth = getAuth(app)
 export const db = getFirestore(app)
+export { db, collection, getDocs, query, where, orderBy, limit }
 export const storage = getStorage(app)
