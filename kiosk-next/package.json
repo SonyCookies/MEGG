@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.2",
+    "cookies-next": "^5.1.0",
     "firebase": "^11.3.1",
     "idb": "^8.0.2",
     "jose": "^6.0.6",
