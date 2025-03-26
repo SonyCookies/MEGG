@@ -6,6 +6,7 @@ import Image from "next/image"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { db } from "../../../../config/firebaseConfig"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { createNotification } from "../../../../lib/notifications/NotificationsService"
 
 export default function ModifyMachines() {
   const [machines, setMachines] = useState([])
@@ -113,11 +114,38 @@ export default function ModifyMachines() {
     setIsEditModalOpen(true)
   }
 
+  // Function to create machine update notification
+  const createMachineUpdateNotification = async (userId, machineName, oldName) => {
+    try {
+      // Create the notification
+      await createNotification(
+        userId,
+        `You've updated machine name from "${oldName}" to "${machineName}"`,
+        "machine_updated",
+      )
+    } catch (error) {
+      console.error("Error creating machine update notification:", error)
+    }
+  }
+
+  // Function to create machine unlink notification
+  const createMachineUnlinkNotification = async (userId, machineName) => {
+    try {
+      // Create the notification
+      await createNotification(userId, `You've unlinked machine: ${machineName}`, "machine_unlinked")
+    } catch (error) {
+      console.error("Error creating machine unlink notification:", error)
+    }
+  }
+
   const handleSave = async () => {
     if (!selectedMachine || !currentUser) return
 
     try {
       setLoading(true)
+
+      // Store the old name for notification
+      const oldName = selectedMachine.name
 
       // Update machine name in Firestore
       const machineRef = doc(db, "machines", selectedMachine.id)
@@ -130,6 +158,11 @@ export default function ModifyMachines() {
       setMachines((prevMachines) =>
         prevMachines.map((m) => (m.id === selectedMachine.id ? { ...m, name: machineName } : m)),
       )
+
+      // Create notification if name was changed
+      if (oldName !== machineName) {
+        await createMachineUpdateNotification(currentUser.uid, machineName, oldName)
+      }
 
       setGlobalMessage("Machine updated successfully!")
       setIsEditModalOpen(false)
@@ -212,6 +245,9 @@ export default function ModifyMachines() {
     try {
       setLoading(true)
 
+      // Store machine name for notification
+      const machineName = selectedMachine.name
+
       // Unlink machine from user
       const userRef = doc(db, "users", currentUser.uid)
       const userDoc = await getDoc(userRef)
@@ -253,6 +289,9 @@ export default function ModifyMachines() {
         status: "revoked",
         revokedAt: new Date().toISOString(),
       })
+
+      // Create unlink notification
+      await createMachineUnlinkNotification(currentUser.uid, machineName)
 
       // Update local state
       setMachines((prevMachines) => prevMachines.filter((m) => m.id !== selectedMachine.id))

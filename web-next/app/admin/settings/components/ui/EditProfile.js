@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { Upload, Trash2, Save } from "lucide-react"
 import Image from "next/image"
-import { db, auth, storage } from "../../../../config/firebaseConfig.js"
+import { db, auth, storage } from "../../../../config/firebaseConfig"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { onAuthStateChanged } from "firebase/auth"
+import { trackProfileChanges } from "../../../../lib/notifications/ProfileChangeTracker.js"
 
 export default function EditProfile() {
   const [profileImage, setProfileImage] = useState("/default.png")
@@ -19,9 +20,10 @@ export default function EditProfile() {
     email: "",
     phone: "",
     address: "",
-    profileImageUrl: "",  
+    profileImageUrl: "",
   })
   const [loading, setLoading] = useState(true)
+  const [originalUserData, setOriginalUserData] = useState({})
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -32,7 +34,7 @@ export default function EditProfile() {
 
           if (docSnap.exists()) {
             const data = docSnap.data()
-            setUserData({
+            const userDataObj = {
               fullname: data.fullname || "",
               birthday: data.birthday || "",
               age: data.age || "",
@@ -41,7 +43,10 @@ export default function EditProfile() {
               phone: data.phone || "",
               address: data.address || "",
               profileImageUrl: data.profileImageUrl || "",
-            })
+            }
+
+            setUserData(userDataObj)
+            setOriginalUserData(userDataObj) // Store original data for change tracking
             setProfileImage(data.profileImageUrl || "/default.png")
           }
         } catch (error) {
@@ -81,6 +86,9 @@ export default function EditProfile() {
         return
       }
 
+      // Store original data for change tracking
+      const oldData = { ...userData }
+
       // Create a reference to the storage location
       const storageRef = ref(storage, `profile-images/${user.uid}`)
 
@@ -102,6 +110,11 @@ export default function EditProfile() {
         ...prev,
         profileImageUrl: downloadURL,
       }))
+
+      // Track changes and create notifications
+      const newData = { ...userData, profileImageUrl: downloadURL }
+      await trackProfileChanges(user.uid, oldData, newData)
+
       setGlobalMessage("Profile image updated successfully!")
     } catch (error) {
       console.error("Error uploading image:", error)
@@ -121,6 +134,9 @@ export default function EditProfile() {
         return
       }
 
+      // Store original data for change tracking
+      const oldData = { ...userData }
+
       // Delete the image from storage if it exists
       if (userData.profileImageUrl) {
         const storageRef = ref(storage, `profile-images/${user.uid}`)
@@ -133,12 +149,17 @@ export default function EditProfile() {
         profileImageUrl: "",
       })
 
-      // Reset states
+      // Update state
       setProfileImage("/default.png")
       setUserData((prev) => ({
         ...prev,
         profileImageUrl: "",
       }))
+
+      // Track changes and create notifications
+      const newData = { ...userData, profileImageUrl: "" }
+      await trackProfileChanges(user.uid, oldData, newData)
+
       setGlobalMessage("Profile image removed successfully!")
     } catch (error) {
       console.error("Error removing image:", error)
@@ -149,6 +170,7 @@ export default function EditProfile() {
       setGlobalMessage("")
     }, 3000)
   }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
 
@@ -159,8 +181,18 @@ export default function EditProfile() {
         return
       }
 
+      // Store original data for change tracking
+      const oldData = { ...originalUserData }
+
+      // Update user data in Firestore
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, userData)
+
+      // Track changes and create notifications
+      await trackProfileChanges(user.uid, oldData, userData)
+
+      // Update original data reference after successful save
+      setOriginalUserData({ ...userData })
 
       setGlobalMessage("Profile updated successfully!")
     } catch (error) {
@@ -206,7 +238,7 @@ export default function EditProfile() {
 
           <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-8">
             <div className="relative rounded-full w-28 h-28 border border-blue-500 overflow-hidden">
-            <Image
+              <Image
                 src={profileImage === "/default.png" ? "/default.png" : profileImage}
                 alt="Profile"
                 fill
