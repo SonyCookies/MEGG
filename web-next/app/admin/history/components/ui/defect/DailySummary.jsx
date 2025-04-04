@@ -1,26 +1,54 @@
-import {
-  BarChart2,
-  Clock,
-  RefreshCw,
-  Target,
-  Calendar,
-  TrendingUp,
-  LineChart,
-} from "lucide-react";
+"use client"
+
+import { useState } from "react"
+import { BarChart2, Clock, RefreshCw, Target, Calendar, TrendingUp, LineChart } from "lucide-react"
+import { useDefectData } from "../../../../../hooks/history/DailySummarry"
+import { DefectChart } from "./DailySummarryChart"
 
 export default function DailySummary() {
+  const [chartType, setChartType] = useState("bar")
+  const {
+    periodTotal,
+    dailyAverage,
+    peakTime,
+    percentageChange,
+    hourlyDistribution,
+    defectCounts,
+    lastUpdated,
+    loading,
+    error,
+    refreshData,
+  } = useDefectData()
+
+  // Format the last updated time
+  const formattedLastUpdated = lastUpdated
+    ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
+    : ""
+
+  // Handle refresh button click
+  const handleRefresh = () => {
+    refreshData()
+  }
+
+  // Handle chart type change
+  const handleChartTypeChange = (type) => {
+    setChartType(type)
+  }
+
   return (
     <div className="flex flex-col gap-6 bg-white border p-6 rounded-2xl shadow relative flex-1">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex flex-col gap-1">
           <h3 className="text-xl font-medium text-gray-800">Daily Summary</h3>
-          <p className="text-gray-500 text-sm">
-            Track defect patterns over time
-          </p>
+          <p className="text-gray-500 text-sm">Track defect patterns over time</p>
         </div>
-        <button className="text-gray-500 hover:text-gray-700 absolute top-6 right-6">
-          <RefreshCw className="w-5 h-5" />
+        <button
+          className="text-gray-500 hover:text-gray-700 absolute top-6 right-6"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
@@ -28,10 +56,16 @@ export default function DailySummary() {
       <div className="flex items-center gap-4">
         <span className="text-sm text-gray-500">Chart Type:</span>
         <div className="flex items-center gap-2">
-          <button className="p-2 rounded text-gray-400 border hover:bg-gray-100">
+          <button
+            className={`p-2 rounded ${chartType === "line" ? "bg-blue-500 text-white" : "text-gray-400 border hover:bg-gray-100"}`}
+            onClick={() => handleChartTypeChange("line")}
+          >
             <LineChart className="w-4 h-4" />
           </button>
-          <button className="p-2 rounded bg-blue-500 text-white">
+          <button
+            className={`p-2 rounded ${chartType === "bar" ? "bg-blue-500 text-white" : "text-gray-400 border hover:bg-gray-100"}`}
+            onClick={() => handleChartTypeChange("bar")}
+          >
             <BarChart2 className="w-4 h-4" />
           </button>
         </div>
@@ -43,7 +77,7 @@ export default function DailySummary() {
         <div className="border rounded-lg p-4 flex">
           <div className="flex-1 flex flex-col gap-4">
             <h3 className="text-gray-500 text-sm">Period Total</h3>
-            <p className="text-4xl font-bold text-blue-600">6</p>
+            <p className="text-4xl font-bold text-blue-600">{loading ? "..." : periodTotal}</p>
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center text-xs">
@@ -51,7 +85,7 @@ export default function DailySummary() {
               </div>
               <div className="flex items-center text-xs text-green-500">
                 <TrendingUp className="w-3 h-3 mr-1" />
-                <span>Infinity% from previous 12h</span>
+                <span>{loading ? "..." : `${percentageChange}% from previous 12h`}</span>
               </div>
             </div>
           </div>
@@ -64,7 +98,7 @@ export default function DailySummary() {
         <div className="border rounded-lg p-4 flex">
           <div className="flex-1 flex flex-col gap-4">
             <h3 className="text-gray-500 text-sm">Daily Average</h3>
-            <p className="text-4xl font-bold text-orange-500">6.0</p>
+            <p className="text-4xl font-bold text-orange-500">{loading ? "..." : dailyAverage.toFixed(1)}</p>
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center text-xs">
@@ -84,7 +118,7 @@ export default function DailySummary() {
         <div className="border rounded-lg p-4 flex">
           <div className="flex-1 flex flex-col gap-4">
             <h3 className="text-gray-500 text-sm">Peak Time</h3>
-            <p className="text-4xl font-bold text-red-500">2-4 PM</p>
+            <p className="text-4xl font-bold text-red-500">{loading ? "..." : peakTime}</p>
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center text-xs">
@@ -105,41 +139,26 @@ export default function DailySummary() {
       <div className="border flex flex-col gap-6 rounded-lg p-6">
         <div className="flex flex-col gap-1">
           <h3 className="font-medium text-gray-800">Defect Trends</h3>
-          <p className="text-sm text-gray-500">
-            Daily defect distribution over time
-          </p>
+          <p className="text-sm text-gray-500">Daily defect distribution over time</p>
         </div>
 
         {/* Chart */}
         <div className="flex flex-col gap-2">
           <div className="h-64 border rounded-lg">
-            {/* Y-axis and chart area */}
-            <div className="flex h-full items-end p-4 relative">
-              {/* Y-axis */}
-              <div className="absolute left-6 h-56 flex flex-col justify-between text-xs text-gray-500">
-                <span>8</span>
-                <span>6</span>
-                <span>4</span>
-                <span>2</span>
-                <span>0</span>
+            {loading ? (
+              <div className="h-full flex items-center justify-center">
+                <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
               </div>
-
-              {/* Bar */}
-              <div className="ml-8 w-full flex items-end justify-center">
-                <div className="flex flex-col items-center">
-                  <div
-                    className="w-16 bg-orange-500 rounded-t-md"
-                    style={{ height: "75%" }}
-                  ></div>
-                  <div className="mt-2 text-xs text-gray-500">11:00 PM</div>
-                </div>
-              </div>
-            </div>
+            ) : error ? (
+              <div className="h-full flex items-center justify-center text-red-500">Error loading chart data</div>
+            ) : (
+              <DefectChart hourlyDistribution={hourlyDistribution} chartType={chartType} />
+            )}
           </div>
 
           <div className="text-xs text-gray-500 flex items-center justify-end gap-2">
             <Clock className="w-4 h-4" />
-            Last updated: 11:21:13 PM
+            Last updated: {formattedLastUpdated}
           </div>
         </div>
 
@@ -149,25 +168,26 @@ export default function DailySummary() {
             <span className="w-3 h-3 rounded-full bg-orange-500"></span>
             <div className="flex items-center justify-between text-sm w-full gap-1">
               <span className="">Dirty </span>
-              <span>(6)</span>
+              <span>({loading ? "..." : defectCounts.dirty})</span>
             </div>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
             <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
             <div className="flex items-center justify-between text-sm w-full gap-1">
               <span className="">Cracked</span>
-              <span>(7)</span>
+              <span>({loading ? "..." : defectCounts.cracked})</span>
             </div>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 border rounded-full">
             <span className="w-3 h-3 rounded-full bg-blue-500"></span>
             <div className="flex items-center justify-between text-sm w-full gap-1">
               <span className="">Good</span>
-              <span>(8)</span>
+              <span>({loading ? "..." : defectCounts.good})</span>
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
+

@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import { Save } from "lucide-react"
-import { auth } from "../../../../config/firebaseConfig.js"
+import { auth, db } from "../../../../config/firebaseConfig.js"
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth"
+import { createNotification } from "../../../../lib/notifications/NotificationsService.js"
+import { doc, getDoc } from "firebase/firestore"
 
 export default function ChangePassword() {
   const [globalMessage, setGlobalMessage] = useState("")
@@ -33,6 +35,40 @@ export default function ChangePassword() {
     const { name, value } = event.target
     setFormData({ ...formData, [name]: value })
     validate(name, value)
+  }
+
+  // Function to check if notifications are enabled
+  const areNotificationsEnabled = async (userId) => {
+    try {
+      const settingsRef = doc(db, "notificationSettings", userId)
+      const settingsSnap = await getDoc(settingsRef)
+
+      if (settingsSnap.exists()) {
+        const settings = settingsSnap.data()
+        return settings.notificationsEnabled && settings.inAppNotifications
+      }
+      return false
+    } catch (error) {
+      console.error("Error checking notification settings:", error)
+      return false
+    }
+  }
+
+  // Function to create password change notification
+  const createPasswordChangeNotification = async (userId) => {
+    try {
+      // Check if notifications are enabled before creating
+      const notificationsEnabled = await areNotificationsEnabled(userId)
+      if (!notificationsEnabled) {
+        console.log("Notifications are disabled for user:", userId)
+        return
+      }
+
+      // Create the notification
+      await createNotification(userId, "Your password has been successfully changed", "password_changed")
+    } catch (error) {
+      console.error("Error creating password change notification:", error)
+    }
   }
 
   const handleSubmit = async (event) => {
@@ -71,6 +107,9 @@ export default function ChangePassword() {
 
         // Update password
         await updatePassword(user, formData.newPassword)
+
+        // Create notification for password change
+        await createPasswordChangeNotification(user.uid)
 
         // Clear form
         setFormData({

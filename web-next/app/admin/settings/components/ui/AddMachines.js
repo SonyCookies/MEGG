@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { Html5Qrcode } from "html5-qrcode"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
+import { createNotification } from "../../../../lib/notifications/NotificationsService"
 
 export default function AddMachines() {
   const [globalMessage, setGlobalMessage] = useState("")
@@ -192,6 +193,20 @@ export default function AddMachines() {
     setShowPinInput(true)
   }
 
+  // Function to create machine linked notification
+  const createMachineLinkNotification = async (userId, machineName) => {
+    try {
+      // Create the notification
+      await createNotification(
+        userId,
+        `You've successfully linked a new machine: ${machineName || "Machine"}`,
+        "machine_linked",
+      )
+    } catch (error) {
+      console.error("Error creating machine link notification:", error)
+    }
+  }
+
   const handleSubmit = async (event) => {
     // Prevent form submission
     event.preventDefault()
@@ -273,7 +288,12 @@ export default function AddMachines() {
         setShowPinInput(false) // Hide PIN input
         setPin("") // Clear PIN
       } else {
-        // Success for new link
+        // Success for new link - Create notification
+        await createMachineLinkNotification(
+          currentUser.uid,
+          machineData.name || scannedMachine.name || `Machine ${machineData.id}`,
+        )
+
         setGlobalMessage("Machine linked successfully!")
         setFormData({ machineCode: "" }) // Reset form
         setScannedMachine(null) // Clear scanned machine data
