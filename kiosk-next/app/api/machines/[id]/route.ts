@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\api\machines\[id]\route.ts
+
 import { NextResponse } from "next/server"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "../../../firebaseConfig"
