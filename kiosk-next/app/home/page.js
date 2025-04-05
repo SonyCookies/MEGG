@@ -1,54 +1,79 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { Wifi, WifiOff, Plug, PlugIcon as PlugOff, Menu, Sun, Moon } from "lucide-react"
-import { useWebSocket } from "../contexts/WebSocketContext"
-import { useInternetConnection } from "../contexts/InternetConnectionContext"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import {
+  Wifi,
+  WifiOff,
+  Plug,
+  PlugIcon as PlugOff,
+  Menu,
+  Sun,
+  Moon,
+} from "lucide-react";
+import { useWebSocket } from "../contexts/WebSocketContext";
+import { useInternetConnection } from "../contexts/InternetConnectionContext";
+
+// Add this constant at the top of your file, before the Home component
+const scanlineKeyframes = `
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+`;
 
 export default function Home() {
-  const { readyState } = useWebSocket()
-  const isOnline = useInternetConnection()
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [isDaytime, setIsDaytime] = useState(true)
+  const { readyState } = useWebSocket();
+  const isOnline = useInternetConnection();
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isDaytime, setIsDaytime] = useState(true);
 
   // Update time every minute
   useEffect(() => {
     const updateTimeAndDayStatus = () => {
-      const now = new Date()
-      setCurrentTime(now)
+      const now = new Date();
+      setCurrentTime(now);
 
       // Check if it's daytime (between 6 AM and 6 PM)
-      const hours = now.getHours()
-      setIsDaytime(hours >= 6 && hours < 18)
-    }
+      const hours = now.getHours();
+      setIsDaytime(hours >= 6 && hours < 18);
+    };
 
     // Initial call
-    updateTimeAndDayStatus()
+    updateTimeAndDayStatus();
 
-    const timer = setInterval(updateTimeAndDayStatus, 60000)
+    const timer = setInterval(updateTimeAndDayStatus, 60000);
 
-    return () => clearInterval(timer)
-  }, [])
+    return () => clearInterval(timer);
+  }, []);
 
   // Add this to the head of the document
   useEffect(() => {
     // Add the keyframes to the document
-    const style = document.createElement("style")
-    style.innerHTML = scanlineKeyframes
-    document.head.appendChild(style)
+    const style = document.createElement("style");
+    style.innerHTML = scanlineKeyframes;
+    document.head.appendChild(style);
 
     return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const formattedTime = currentTime.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
-  })
+  });
 
   // Current date formatted nicely
   const formattedDate = currentTime.toLocaleDateString([], {
@@ -56,7 +81,7 @@ export default function Home() {
     year: "numeric",
     month: "long",
     day: "numeric",
-  })
+  });
 
   return (
     <div className="min-h-screen bg-[#0e5f97] p-3 sm:p-4 md:p-6 relative overflow-hidden">
@@ -111,7 +136,9 @@ export default function Home() {
             >
               {/* Pulsing ring effect instead of dot */}
               <div
-                className={`absolute inset-0 rounded-full ${isOnline ? "bg-green-400/10" : "bg-red-400/10"} 
+                className={`absolute inset-0 rounded-full ${
+                  isOnline ? "bg-green-400/10" : "bg-red-400/10"
+                } 
                               animate-ping opacity-75`}
               ></div>
               {isOnline ? (
@@ -133,7 +160,11 @@ export default function Home() {
             >
               {/* Pulsing ring effect instead of dot */}
               <div
-                className={`absolute inset-0 rounded-full ${readyState === WebSocket.OPEN ? "bg-green-400/10" : "bg-red-400/10"} 
+                className={`absolute inset-0 rounded-full ${
+                  readyState === WebSocket.OPEN
+                    ? "bg-green-400/10"
+                    : "bg-red-400/10"
+                } 
                               animate-ping opacity-75`}
               ></div>
               {readyState === WebSocket.OPEN ? (
@@ -149,9 +180,15 @@ export default function Home() {
 
               {/* Sun/Moon icon based on time of day */}
               <div
-                className={`relative z-10 transition-all duration-500 ${isDaytime ? "text-yellow-300" : "text-blue-200"}`}
+                className={`relative z-10 transition-all duration-500 ${
+                  isDaytime ? "text-yellow-300" : "text-blue-200"
+                }`}
               >
-                {isDaytime ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {isDaytime ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
               </div>
 
               <span className="relative z-10">{formattedTime}</span>
@@ -189,10 +226,14 @@ export default function Home() {
             {/* Content with creative styling */}
             <div className="flex-1">
               <div className="relative">
-                <h2 className="text-white text-xl font-medium pl-2 relative z-10">Welcome to Megg</h2>
+                <h2 className="text-white text-xl font-medium pl-2 relative z-10">
+                  Welcome to Megg
+                </h2>
               </div>
 
-              <p className="text-white/80 mt-2 ml-2 relative">Please select an option below</p>
+              <p className="text-white/80 mt-2 ml-2 relative">
+                Please select an option below
+              </p>
             </div>
           </div>
         </div>
@@ -219,7 +260,12 @@ export default function Home() {
 
             <div
               className="bg-[#ffffff] p-3 sm:p-4 rounded-full mb-3 sm:mb-4 flex items-center justify-center border border-[#0e5f97]/10 relative overflow-hidden shadow-md"
-              style={{ width: "80px", height: "80px", maxWidth: "100%", backgroundColor: "#ffffff" }}
+              style={{
+                width: "80px",
+                height: "80px",
+                maxWidth: "100%",
+                backgroundColor: "#ffffff",
+              }}
             >
               {/* Shine effect */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#0e5f97]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-full group-hover:translate-x-full"></div>
@@ -265,14 +311,25 @@ export default function Home() {
 
             <div
               className="bg-[#ffffff] p-3 sm:p-4 rounded-full mb-3 sm:mb-4 flex items-center justify-center border border-[#0e5f97]/10 relative overflow-hidden shadow-md"
-              style={{ width: "80px", height: "80px", maxWidth: "100%", backgroundColor: "#ffffff" }}
+              style={{
+                width: "80px",
+                height: "80px",
+                maxWidth: "100%",
+                backgroundColor: "#ffffff",
+              }}
             >
               {/* Shine effect */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#0e5f97]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-full group-hover:translate-x-full"></div>
 
               {/* Icon with scale effect on hover but no float animation */}
               <div className="relative z-10 transform group-hover:scale-110 transition-transform duration-300">
-                <Image src="/Icons/settings.gif" alt="Settings" width={60} height={60} className="object-contain" />
+                <Image
+                  src="/Icons/settings.gif"
+                  alt="Settings"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
               </div>
             </div>
 
@@ -305,14 +362,25 @@ export default function Home() {
 
             <div
               className="bg-[#ffffff] p-3 sm:p-4 rounded-full mb-3 sm:mb-4 flex items-center justify-center border border-[#0e5f97]/10 relative overflow-hidden shadow-md"
-              style={{ width: "80px", height: "80px", maxWidth: "100%", backgroundColor: "#ffffff" }}
+              style={{
+                width: "80px",
+                height: "80px",
+                maxWidth: "100%",
+                backgroundColor: "#ffffff",
+              }}
             >
               {/* Shine effect */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#0e5f97]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-full group-hover:translate-x-full"></div>
 
               {/* Icon with scale effect on hover but no float animation */}
               <div className="relative z-10 transform group-hover:scale-110 transition-transform duration-300">
-                <Image src="/Icons/user.gif" alt="Account" width={60} height={60} className="object-contain" />
+                <Image
+                  src="/Icons/user.gif"
+                  alt="Account"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
               </div>
             </div>
 
@@ -327,76 +395,38 @@ export default function Home() {
         </div>
 
         {/* Creative Promotional Banner */}
-        <div className="bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-lg shadow-lg p-4 sm:p-5 mb-4 relative overflow-hidden group">
+        <div className="bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-lg shadow-lg mb-4 relative overflow-hidden group">
           {/* Dynamic background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            {/* Animated egg shapes */}
-            <div
-              className="absolute top-1/4 right-1/4 w-40 h-56 bg-white/5 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] blur-xl animate-pulse"
-              style={{ animationDuration: "4s" }}
-            ></div>
-            <div
-              className="absolute bottom-0 left-1/3 w-32 h-40 bg-white/5 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] blur-xl animate-pulse"
-              style={{ animationDuration: "5s", animationDelay: "1s" }}
-            ></div>
+         
 
-            {/* Egg pattern grid */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9InN2ZyI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMzAgMTVjLTguMjg0IDAtMTUgMTAuNzUtMTUgMjRzMTAuNzUgMTggMjQgMThzMTgtMTAuNzUgMTgtMjRTMzcuMjg0IDE1IDM3IDE1SDMweiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEiLz48L2c+PC9zdmc+')] opacity-10 transform rotate-12 scale-150"></div>
-
-            {/* Light beams */}
-            <div className="absolute -top-20 left-1/2 w-1 h-40 bg-gradient-to-b from-cyan-300/40 to-transparent blur-md transform -translate-x-1/2 rotate-15"></div>
-            <div className="absolute -top-20 left-1/3 w-1 h-40 bg-gradient-to-b from-cyan-300/20 to-transparent blur-md transform -translate-x-1/2 -rotate-15"></div>
-
-            {/* Subtle cyan accent */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent"></div>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative z-10">
-            {/* Content side with creative layout */}
-            <div className="text-white relative text-center md:text-left">
-              <h3 className="text-xl font-medium mb-2">Megg Detection System</h3>
-              <p className="text-white/80 mb-3">Egg detection powered by AI</p>
+          <div className="relative z-10">
+            <div className="hidden md:flex w-full h-auto relative rounded-md overflow-hidden">
+              <Image
+                src="/images/BANNER_L.png"
+                alt="Megg Detection System Banner"
+                width={1024}
+                height={200}
+                quality={100}
+                className="w-full h-auto object-cover"
+                priority
+                unoptimized
+              />
             </div>
-
-            {/* Creative logo display */}
-            <div className="relative mx-auto md:mx-0">
-              {/* Egg-shaped container with 3D effect */}
-              <div className="relative w-24 sm:w-28 h-32 sm:h-36 flex items-center justify-center">
-                {/* Layered egg shapes for 3D effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-white/5 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] rotate-12 backdrop-blur-sm border border-white/20 shadow-lg transform transition-transform group-hover:rotate-6 group-hover:scale-105 duration-500"></div>
-                <div className="absolute inset-2 bg-gradient-to-tr from-white/20 to-white/10 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] rotate-12 backdrop-blur-sm border border-white/10"></div>
-
-                {/* Logo container */}
-                <div className="relative p-2 transform -rotate-6 transition-transform group-hover:rotate-0 duration-500">
-                  <div className="relative w-20 h-20 overflow-hidden">
-                    <Image
-                      src="/Logos/logowhite.png"
-                      alt="Megg Logo"
-                      width={80}
-                      height={80}
-                      className="object-contain"
-                    />
-
-                    {/* Shine effect */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-full group-hover:translate-x-full"></div>
-                  </div>
-                </div>
-
-                {/* Small decorative eggs */}
-                <div
-                  className="absolute -bottom-2 -left-4 w-8 h-10 bg-gradient-to-br from-cyan-300/30 to-white/10 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] rotate-12 blur-sm animate-pulse"
-                  style={{ animationDuration: "3s" }}
-                ></div>
-                <div
-                  className="absolute -top-2 -right-2 w-6 h-8 bg-gradient-to-br from-cyan-300/20 to-white/5 rounded-[60%_40%_40%_60%/60%_60%_40%_40%] -rotate-12 blur-sm animate-pulse"
-                  style={{ animationDuration: "4s" }}
-                ></div>
-              </div>
+            <div className="md:hidden w-full h-auto relative rounded-md overflow-hidden">
+              <Image
+                src="/images/BANNER_S.png"
+                alt="Megg Detection System Banner"
+                width={1024}
+                height={200}
+                quality={100}
+                className="w-full h-auto object-cover"
+                priority
+                unoptimized
+              />
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
