@@ -87,7 +87,8 @@ export default function Home() {
     <div className="min-h-screen bg-[#0e5f97] p-3 sm:p-4 md:p-6 relative overflow-hidden">
       {/* Background pattern with subtle animation */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-30"></div>
+        {/* grids */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-60"></div>
 
         {/* Global animated egg shapes */}
         <div
@@ -107,7 +108,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto relative">
         {/* Enhanced Header with logo, time and status indicators */}
         <header className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0 mb-4 sm:mb-6 text-white">
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3 group my-2 sm:my-0">
             <div className="h-10 w-auto relative">
               <div className="absolute inset-0 bg-white rounded opacity-80 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-300/10 to-transparent rounded blur-sm transform scale-110 opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
@@ -123,55 +124,58 @@ export default function Home() {
           </div>
 
           {/* Time and enhanced status indicators */}
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            {/* Internet status - Fixed pulsing effect */}
-            <div
-              className={`relative flex items-center justify-center w-9 h-9 rounded-full 
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            {/* interner and web socket icon */}
+            <div className="flex items-center gap-3">
+              {/* Internet status - Fixed pulsing effect */}
+              <div
+                className={`relative flex items-center justify-center w-9 h-9 rounded-full 
                             ${
                               isOnline
                                 ? "bg-gradient-to-br from-green-400/20 to-green-600/20 border border-green-400/30"
                                 : "bg-gradient-to-br from-red-400/20 to-red-600/20 border border-red-400/30"
                             } 
                             shadow-sm transition-all duration-300`}
-            >
-              {/* Pulsing ring effect instead of dot */}
-              <div
-                className={`absolute inset-0 rounded-full ${
-                  isOnline ? "bg-green-400/10" : "bg-red-400/10"
-                } 
+              >
+                {/* Pulsing ring effect instead of dot */}
+                <div
+                  className={`absolute inset-0 rounded-full ${
+                    isOnline ? "bg-green-400/10" : "bg-red-400/10"
+                  } 
                               animate-ping opacity-75`}
-              ></div>
-              {isOnline ? (
-                <Wifi className="w-4 h-4 text-green-400 relative z-10" />
-              ) : (
-                <WifiOff className="w-4 h-4 text-red-400 relative z-10" />
-              )}
-            </div>
+                ></div>
+                {isOnline ? (
+                  <Wifi className="w-4 h-4 text-green-400 relative z-10" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-400 relative z-10" />
+                )}
+              </div>
 
-            {/* WebSocket status - Fixed pulsing effect */}
-            <div
-              className={`relative flex items-center justify-center w-9 h-9 rounded-full 
+              {/* WebSocket status - Fixed pulsing effect */}
+              <div
+                className={`relative flex items-center justify-center w-9 h-9 rounded-full 
                             ${
                               readyState === WebSocket.OPEN
                                 ? "bg-gradient-to-br from-green-400/20 to-green-600/20 border border-green-400/30"
                                 : "bg-gradient-to-br from-red-400/20 to-red-600/20 border border-red-400/30"
                             } 
                             shadow-sm transition-all duration-300`}
-            >
-              {/* Pulsing ring effect instead of dot */}
-              <div
-                className={`absolute inset-0 rounded-full ${
-                  readyState === WebSocket.OPEN
-                    ? "bg-green-400/10"
-                    : "bg-red-400/10"
-                } 
+              >
+                {/* Pulsing ring effect instead of dot */}
+                <div
+                  className={`absolute inset-0 rounded-full ${
+                    readyState === WebSocket.OPEN
+                      ? "bg-green-400/10"
+                      : "bg-red-400/10"
+                  } 
                               animate-ping opacity-75`}
-              ></div>
-              {readyState === WebSocket.OPEN ? (
-                <Plug className="w-4 h-4 text-green-400 relative z-10" />
-              ) : (
-                <PlugOff className="w-4 h-4 text-red-400 relative z-10" />
-              )}
+                ></div>
+                {readyState === WebSocket.OPEN ? (
+                  <Plug className="w-4 h-4 text-green-400 relative z-10" />
+                ) : (
+                  <PlugOff className="w-4 h-4 text-red-400 relative z-10" />
+                )}
+              </div>
             </div>
 
             {/* Time with sun/moon icon and subtle animation */}
@@ -197,7 +201,7 @@ export default function Home() {
         </header>
 
         {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-lg shadow-lg p-5 mb-6 relative overflow-hidden group">
+        <div className="bg-gradient-to-r from-[#0c5383] to-[#093b5a] rounded-lg shadow-sm p-5 mb-6 relative overflow-hidden group">
           {/* Dynamic background elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Animated egg shapes */}
@@ -395,14 +399,12 @@ export default function Home() {
         </div>
 
         {/* Creative Promotional Banner */}
-        <div className="bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-lg shadow-lg mb-4 relative overflow-hidden group">
+        <div className="bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-lg shadow-md mb-4 relative overflow-hidden group">
           {/* Dynamic background elements */}
-         
-
           <div className="relative z-10">
             <div className="hidden md:flex w-full h-auto relative rounded-md overflow-hidden">
               <Image
-                src="/images/BANNER_L.png"
+                src="/images/BANNER_L_PROTOTYPE.png"
                 alt="Megg Detection System Banner"
                 width={1024}
                 height={200}
@@ -414,7 +416,7 @@ export default function Home() {
             </div>
             <div className="md:hidden w-full h-auto relative rounded-md overflow-hidden">
               <Image
-                src="/images/BANNER_S.png"
+                src="/images/BANNER_S_PROTOTYPE.png"
                 alt="Megg Detection System Banner"
                 width={1024}
                 height={200}
