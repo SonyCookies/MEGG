@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\detection\hooks\useMachineId.js
+
 "use client"
 
 import { useState, useCallback, useEffect } from "react"

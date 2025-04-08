@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\components\ConnectionStatus.js
+
 import { Wifi, WifiOff } from "lucide-react"
 
 export function ConnectionStatus({ isOnline, readyState }) {
