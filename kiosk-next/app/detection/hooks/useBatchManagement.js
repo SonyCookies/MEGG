@@ -3,10 +3,56 @@
 import { useState, useEffect, useCallback } from "react"
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy } from "firebase/firestore"
 import { db } from "../../firebaseConfig"
-import { createNewBatch } from "../models/batch"
 import { logger } from "../utils"
 
 const log = logger("useBatchManagement")
+
+// Helper function to generate a batch number with sequential numbering
+const generateBatchNumber = (existingBatches) => {
+  const now = new Date()
+  const datePrefix = `B${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
+
+  // Find batches with the same date prefix
+  const todaysBatches = existingBatches.filter(
+    (batch) => batch.batch_number && batch.batch_number.startsWith(datePrefix),
+  )
+
+  // Find the highest sequence number
+  let highestSequence = 0
+  todaysBatches.forEach((batch) => {
+    const sequencePart = batch.batch_number.split("-")[1]
+    if (sequencePart) {
+      const sequence = Number.parseInt(sequencePart, 10)
+      if (!isNaN(sequence) && sequence > highestSequence) {
+        highestSequence = sequence
+      }
+    }
+  })
+
+  // Generate the next sequence number
+  const nextSequence = highestSequence + 1
+  const sequenceFormatted = String(nextSequence).padStart(4, "0")
+
+  return `${datePrefix}-${sequenceFormatted}`
+}
+
+// Create a new batch with the proper structure
+const createNewBatch = (machineId, batchNumber) => {
+  return {
+    machine_id: machineId,
+    batch_number: batchNumber,
+    status: "active",
+    total_count: 0,
+    defect_counts: {
+      good: 0,
+      dirty: 0,
+      broken: 0,
+      cracked: 0,
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+}
 
 export default function useBatchManagement(machineId) {
   const [batches, setBatches] = useState([])
@@ -42,7 +88,7 @@ export default function useBatchManagement(machineId) {
         // If batch_number doesn't exist, generate one from the timestamp
         if (!batchData.batch_number) {
           const date = new Date(batchData.created_at)
-          batchData.batch_number = `B${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}-${String(date.getHours()).padStart(2, "0")}${String(date.getMinutes()).padStart(2, "0")}`
+          batchData.batch_number = `B${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}-0001`
           log(`Generated batch_number for existing batch: ${batchData.batch_number}`)
         }
 
@@ -78,7 +124,10 @@ export default function useBatchManagement(machineId) {
       }
 
       try {
-        const newBatchData = createNewBatch(machineId)
+        // Generate a sequential batch number based on existing batches
+        const batchNumber = generateBatchNumber(batches)
+        const newBatchData = createNewBatch(machineId, batchNumber)
+
         if (notes) {
           newBatchData.notes = notes
         }
@@ -100,7 +149,7 @@ export default function useBatchManagement(machineId) {
         return null
       }
     },
-    [machineId],
+    [machineId, batches],
   )
 
   // Select an existing batch
@@ -230,4 +279,3 @@ export default function useBatchManagement(machineId) {
     completeBatch,
   }
 }
-

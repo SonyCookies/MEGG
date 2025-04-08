@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\detection\hooks\useFrameCapture.js
+
 "use client"
 
 import { useCallback, useRef } from "react"

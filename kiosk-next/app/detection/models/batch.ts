@@ -1,3 +1,5 @@
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\detection\models\batch.ts
+
 // Batch model definition
 export interface Batch {
   id: string // Unique batch ID (e.g., B20230615-1430)
