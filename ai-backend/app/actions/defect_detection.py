@@ -7,7 +7,7 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH = "D:/4TH YEAR/CAPSTONE/MEGG/ai-backend/model/egg_resnet50.keras"
+MODEL_PATH = "/home/megg/MEGG/ai-backend/model/egg_resnet50.keras"
 IMG_WIDTH, IMG_HEIGHT = 224, 224
 CLASS_LABELS = ["cracked", "dirty", "good"]
 
