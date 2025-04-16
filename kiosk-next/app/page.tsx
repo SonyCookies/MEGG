@@ -1,12 +1,24 @@
+
 "use client"
-import Link from "next/link"
+import type React from "react"
+
 import Image from "next/image"
-import { Settings, LogIn, Egg } from "lucide-react"
+import { Settings, LogIn } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import EggLoading from "./components/egg-loading"
 
 export default function Home() {
+  const router = useRouter()
   const [isLoaded, setIsLoaded] = useState(false)
   const [hoverButton, setHoverButton] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [navigateTo, setNavigateTo] = useState("")
+  const [loadingContext, setLoadingContext] = useState({
+    title: "",
+    icon: null,
+    destination: "",
+  })
 
   useEffect(() => {
     // Trigger animations after component mounts
@@ -17,8 +29,46 @@ export default function Home() {
     }
   }, [])
 
+  const handleButtonClick = (route: string) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    // console.log(`🖱️ Button clicked: Navigating to ${route}`)
+    setIsLoading(true)
+    setNavigateTo(route)
+
+    // Set loading context based on destination
+    if (route === "/login") {
+      // console.log("🔑 Setting context for login navigation")
+      setLoadingContext({
+        title: "Accessing Login",
+        icon: "login",
+        destination: route,
+      })
+    } else if (route === "/setup") {
+      // console.log("⚙️ Setting context for setup navigation")
+      setLoadingContext({
+        title: "Preparing Setup",
+        icon: "setup",
+        destination: route,
+      })
+    }
+  }
+
+  const handleLoadingComplete = () => {
+    // console.log("✅ Loading complete callback triggered")
+    setIsLoading(false)
+    if (navigateTo) {
+      // console.log(`🧭 Navigating to: ${navigateTo}`)
+      // Use router.push instead of directly setting window.location
+      // for better Next.js integration
+      router.push(navigateTo)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-[#0e5f97] pt-6 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
+    <div className="min-h-screen bg-[#0e5f97] pt-4 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
+      {/* Loading overlay */}
+      <EggLoading isLoading={isLoading} onComplete={handleLoadingComplete} context={loadingContext} />
+
       {/* Dynamic background with floating particles */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
 
@@ -27,7 +77,7 @@ export default function Home() {
         className={`max-w-3xl w-full transition-all duration-1000 ${isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
       >
         {/* Card with glass morphism effect */}
-        <div className="relative backdrop-blur-sm bg-white/90 rounded-2xl shadow-2xl overflow-hidden border border-white/50">
+        <div className="relative backdrop-blur-sm bg-white/90 rounded-2xl shadow-2xl overflow-hidden border border-white/50 h-[440px]">
           {/* Holographic overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-transparent via-cyan-300/10 to-transparent opacity-50 mix-blend-overlay"></div>
 
@@ -47,10 +97,10 @@ export default function Home() {
             ></div>
           </div>
 
-          {/* Two-column layout */}
-          <div className="flex flex-col md:flex-row relative z-10">
+          {/* Two-column layout - full height */}
+          <div className="flex flex-col md:flex-row relative z-10 h-full">
             {/* Left column - Logo section with creative background */}
-            <div className="md:w-1/2 p-6 flex items-center justify-center relative overflow-hidden">
+            <div className="md:w-1/2 p-4 flex items-center justify-center relative overflow-hidden h-full">
               {/* Creative background elements */}
               <div className="absolute -top-20 -left-20 w-40 h-40 bg-gradient-to-br from-[#0e5f97]/20 to-transparent rounded-full blur-xl"></div>
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-gradient-to-tl from-[#0e5f97]/30 to-transparent rounded-full blur-xl"></div>
@@ -93,7 +143,7 @@ export default function Home() {
                 </div>
 
                 {/* Brand name with enhanced creative animation */}
-                <div className="mt-4 relative">
+                <div className="mt-6 relative">
                   <h1 className="text-5xl text-center font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] tracking-wider animate-text-shimmer">
                     MEGG
                   </h1>
@@ -123,48 +173,44 @@ export default function Home() {
             {/* Creative divider between columns */}
             <div className="hidden md:block absolute left-1/2 top-0 bottom-0 transform -translate-x-1/2 w-[2px] z-20">
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0e5f97]/30 to-transparent"></div>
-
-              {/* Center emblem */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-br from-[#0e5f97] to-[#0c4d7a] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(14,95,151,0.6)] z-30">
-                <Egg className="w-5 h-5 text-white" />
-              </div>
             </div>
 
             {/* Right column - Buttons section with creative background */}
-            <div className="md:w-1/2 p-6 flex flex-col justify-center space-y-5 relative">
+            <div className="md:w-1/2 p-4 flex flex-col justify-center space-y-8 relative h-full">
               {/* Creative background elements */}
               <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-gradient-to-tl from-[#0e5f97]/20 to-transparent rounded-full blur-xl"></div>
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-gradient-to-br from-[#0e5f97]/30 to-transparent rounded-full blur-xl"></div>
 
               {/* Setup button with enhanced effects */}
-              <Link
+              <a
                 href="/setup"
                 className="block w-full group"
+                onClick={handleButtonClick("/setup")}
                 onMouseEnter={() => setHoverButton("setup")}
                 onMouseLeave={() => setHoverButton(null)}
               >
-                <div className="flex items-center gap-4 px-6 py-4 bg-white rounded-xl shadow-md border border-[#0e5f97]/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-white rounded-xl shadow-md border border-[#0e5f97]/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
                   {/* Background animation on hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0e5f97]/0 via-[#0e5f97]/5 to-[#0e5f97]/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
 
                   {/* Icon container with enhanced effects */}
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 bg-[#0e5f97]/10 rounded-full opacity-0 group-hover:opacity-100 transform scale-0 group-hover:scale-150 transition-all duration-300"></div>
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0e5f97]/10 to-[#0e5f97]/5 flex items-center justify-center">
-                      <Settings className="h-6 w-6 text-[#0e5f97] relative z-10 transform group-hover:rotate-90 transition-transform duration-500" />
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#0e5f97]/10 to-[#0e5f97]/5 flex items-center justify-center">
+                      <Settings className="h-7 w-7 text-[#0e5f97] relative z-10 transform group-hover:rotate-90 transition-transform duration-500" />
                     </div>
                   </div>
 
                   <div className="flex-1">
-                    <span className="font-medium text-[#0e5f97] text-lg block">Setup New Machine</span>
-                    <span className="text-xs text-[#0e5f97]/70 mt-0.5 block">Configure and register your device</span>
+                    <span className="font-medium text-[#0e5f97] text-xl block">Setup New Machine</span>
+                    <span className="text-sm text-[#0e5f97]/70 mt-1 block">Configure and register your device</span>
                   </div>
 
                   {/* Animated arrow */}
                   <div
                     className={`text-[#0e5f97]/70 transform transition-transform duration-300 ${hoverButton === "setup" ? "translate-x-1" : ""}`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path
                         fillRule="evenodd"
                         d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
@@ -173,37 +219,38 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-              </Link>
+              </a>
 
               {/* Login button with enhanced effects */}
-              <Link
+              <a
                 href="/login"
                 className="block w-full group"
+                onClick={handleButtonClick("/login")}
                 onMouseEnter={() => setHoverButton("login")}
                 onMouseLeave={() => setHoverButton(null)}
               >
-                <div className="flex items-center gap-4 px-6 py-4 bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-xl shadow-md border border-white/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-xl shadow-md border border-white/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
                   {/* Enhanced background animation on hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
 
                   {/* Icon container with enhanced effects */}
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transform scale-0 group-hover:scale-150 transition-all duration-300"></div>
-                    <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                      <LogIn className="h-6 w-6 text-white relative z-10 transform group-hover:translate-x-1 transition-transform duration-300" />
+                    <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+                      <LogIn className="h-7 w-7 text-white relative z-10 transform group-hover:translate-x-1 transition-transform duration-300" />
                     </div>
                   </div>
 
                   <div className="flex-1">
-                    <span className="font-medium text-white text-lg block">Login to Machine</span>
-                    <span className="text-xs text-white/70 mt-0.5 block">Access your device controls</span>
+                    <span className="font-medium text-white text-xl block">Login to Machine</span>
+                    <span className="text-sm text-white/70 mt-1 block">Access your device controls</span>
                   </div>
 
                   {/* Animated arrow */}
                   <div
                     className={`text-white/70 transform transition-transform duration-300 ${hoverButton === "login" ? "translate-x-1" : ""}`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path
                         fillRule="evenodd"
                         d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
@@ -212,23 +259,7 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-              </Link>
-
-              {/* Decorative element */}
-              <div className="absolute bottom-3 right-3 opacity-30">
-                <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M50 0C22.4 0 0 22.4 0 50C0 77.6 22.4 100 50 100C77.6 100 100 77.6 100 50C100 22.4 77.6 0 50 0ZM50 90C27.9 90 10 72.1 10 50C10 27.9 27.9 10 50 10C72.1 10 90 27.9 90 50C90 72.1 72.1 90 50 90Z"
-                    fill="#0e5f97"
-                    fillOpacity="0.2"
-                  />
-                  <path
-                    d="M50 20C33.4 20 20 33.4 20 50C20 66.6 33.4 80 50 80C66.6 80 80 66.6 80 50C80 33.4 66.6 20 50 20ZM50 70C39 70 30 61 30 50C30 39 39 30 50 30C61 30 70 39 70 50C70 61 61 70 50 70Z"
-                    fill="#0e5f97"
-                    fillOpacity="0.2"
-                  />
-                </svg>
-              </div>
+              </a>
             </div>
           </div>
 
