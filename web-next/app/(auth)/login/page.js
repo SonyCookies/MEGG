@@ -1,34 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { db, auth } from "../../config/firebaseConfig.js"
-import { collection, query, where, getDocs, setDoc, doc, getDoc, updateDoc } from "firebase/firestore"
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  PhoneAuthProvider,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
-  signInWithCredential,
-} from "firebase/auth"
+import { collection, query, where, getDocs, setDoc, doc } from "firebase/firestore"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 import Image from "next/image"
 import { generateOTP, calculateOTPExpiry } from "../../../app/utils/otp"
-import { ChevronDown, Check } from "lucide-react"
-
-// Country data with phone codes and flags
-const countries = [
-  { code: "US", name: "United States", phoneCode: "+1", flag: "🇺🇸" },
-  { code: "GB", name: "United Kingdom", phoneCode: "+44", flag: "🇬🇧" },
-  { code: "PH", name: "Philippines", phoneCode: "+63", flag: "🇵🇭" },
-  { code: "IN", name: "India", phoneCode: "+91", flag: "🇮🇳" },
-  { code: "AU", name: "Australia", phoneCode: "+61", flag: "🇦🇺" },
-  { code: "CA", name: "Canada", phoneCode: "+1", flag: "🇨🇦" },
-  { code: "SG", name: "Singapore", phoneCode: "+65", flag: "🇸🇬" },
-  { code: "MY", name: "Malaysia", phoneCode: "+60", flag: "🇲🇾" },
-].sort((a, b) => a.name.localeCompare(b.name))
 
 // Function to encrypt credentials
 const encryptCredentials = (username, password) => {
@@ -64,22 +43,13 @@ const sendVerificationEmail = async (email, otp) => {
 }
 
 export default function LoginPage() {
-  const [loginMethod, setLoginMethod] = useState("email") // "email" | "phone"
   const [form, setForm] = useState({
     username: "",
     password: "",
-    phone: "",
   })
-  const [selectedCountry, setSelectedCountry] = useState(countries[0])
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [verificationId, setVerificationId] = useState("")
-  const [showOTPInput, setShowOTPInput] = useState(false)
-  const [otp, setOtp] = useState("")
-  const recaptchaContainerRef = useRef(null)
-  const recaptchaVerifierRef = useRef(null)
   const router = useRouter()
 
   // Load saved credentials on component mount
@@ -96,195 +66,19 @@ export default function LoginPage() {
         setRememberMe(true)
       }
     }
-
-    return () => {
-      // Clean up reCAPTCHA
-      cleanupRecaptcha()
-    }
   }, [])
-
-  const cleanupRecaptcha = () => {
-    if (recaptchaVerifierRef.current) {
-      try {
-        recaptchaVerifierRef.current.clear()
-      } catch (error) {
-        console.error("Error clearing reCAPTCHA:", error)
-      }
-      recaptchaVerifierRef.current = null
-    }
-  }
-
-  const initializeRecaptcha = async () => {
-    try {
-      // Clean up existing reCAPTCHA
-      cleanupRecaptcha()
-
-      // Create a new container element
-      const container = document.createElement("div")
-      container.id = "recaptcha-container-" + Date.now()
-      recaptchaContainerRef.current.innerHTML = ""
-      recaptchaContainerRef.current.appendChild(container)
-
-      // Initialize new reCAPTCHA verifier
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, container, {
-        size: "invisible",
-        callback: () => {
-          console.log("reCAPTCHA solved")
-        },
-        "expired-callback": () => {
-          console.log("reCAPTCHA expired")
-          setGlobalMessage("Verification expired. Please try again.")
-          cleanupRecaptcha()
-        },
-      })
-
-      await recaptchaVerifierRef.current.render()
-      return recaptchaVerifierRef.current
-    } catch (error) {
-      console.error("Error initializing reCAPTCHA:", error)
-      throw error
-    }
-  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    let processedValue = value
-
-    // Special handling for phone number
-    if (name === "phone") {
-      // Remove any non-digit characters except plus sign
-      processedValue = value.replace(/[^\d+]/g, "")
-
-      // Ensure the phone number starts with the country code
-      if (!processedValue.startsWith(selectedCountry.phoneCode)) {
-        processedValue = selectedCountry.phoneCode
-      }
-    }
-
-    setForm((prev) => ({ ...prev, [name]: processedValue }))
-  }
-
-  const handleCountrySelect = (country) => {
-    setSelectedCountry(country)
-    setShowCountryDropdown(false)
-
-    // Update phone number with new country code
-    const phoneWithoutCode = form.phone.replace(selectedCountry.phoneCode, "")
-    setForm((prev) => ({
-      ...prev,
-      phone: country.phoneCode + phoneWithoutCode,
-    }))
+    setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const resetFields = () => {
     setForm({
       username: "",
       password: "",
-      phone: "",
     })
-    setOtp("")
-    setShowOTPInput(false)
-    setVerificationId("")
     localStorage.removeItem("rememberedCredentials")
-  }
-
-  const handlePhoneLogin = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setGlobalMessage("")
-
-    try {
-      if (!form.phone) {
-        setGlobalMessage("Please enter your phone number.")
-        return
-      }
-
-      // Initialize reCAPTCHA
-      const verifier = await initializeRecaptcha()
-
-      // Send verification code
-      const confirmationResult = await signInWithPhoneNumber(auth, form.phone, verifier)
-
-      setVerificationId(confirmationResult.verificationId)
-      setShowOTPInput(true)
-      setGlobalMessage("Verification code sent! Please check your phone.")
-    } catch (error) {
-      console.error("Phone login error:", error)
-      let errorMessage = "Failed to send verification code. Please try again."
-
-      if (error.code === "auth/invalid-phone-number") {
-        errorMessage = "Please enter a valid phone number."
-      } else if (error.code === "auth/quota-exceeded") {
-        errorMessage = "SMS quota exceeded. Please try again later."
-      } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Too many attempts. Please try again later."
-      }
-
-      setGlobalMessage(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setGlobalMessage("")
-
-    try {
-      if (!otp || !verificationId) {
-        setGlobalMessage("Please enter the verification code.")
-        return
-      }
-
-      // Create credential
-      const credential = PhoneAuthProvider.credential(verificationId, otp)
-
-      // Sign in with credential
-      const result = await signInWithCredential(auth, credential)
-      const user = result.user
-
-      // Check if user exists in Firestore
-      const userDoc = await getDoc(doc(db, "users", user.uid))
-
-      if (!userDoc.exists()) {
-        // Create new user document if it doesn't exist
-        await setDoc(doc(db, "users", user.uid), {
-          phone: user.phoneNumber,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-          verified: true,
-          provider: "phone",
-        })
-      } else {
-        // Update last login
-        await updateDoc(doc(db, "users", user.uid), {
-          lastLogin: new Date().toISOString(),
-        })
-      }
-
-      setGlobalMessage("Login successful!")
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          uid: user.uid,
-          phone: user.phoneNumber,
-        }),
-      )
-
-      setTimeout(() => router.replace("/admin/dashboard"), 2000)
-    } catch (error) {
-      console.error("OTP verification error:", error)
-      let errorMessage = "Invalid verification code. Please try again."
-
-      if (error.code === "auth/code-expired") {
-        errorMessage = "Verification code has expired. Please request a new one."
-      }
-
-      setGlobalMessage(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
   }
 
   const handleLogin = async (e) => {
@@ -369,7 +163,7 @@ export default function LoginPage() {
         }),
       )
 
-      setTimeout(() => router.replace("/admin/dashboard"), 2000)
+      setTimeout(() => router.replace("/admin/overview"), 2000)
     } catch (error) {
       console.error("Login error:", error)
       let errorMessage = "Login failed. Please check your credentials."
@@ -425,7 +219,7 @@ export default function LoginPage() {
 
       setGlobalMessage("Login successful!")
       localStorage.setItem("user", JSON.stringify(userData))
-      setTimeout(() => router.replace("/admin/dashboard"), 2000)
+      setTimeout(() => router.replace("/admin/overview"), 2000)
     } catch (error) {
       console.error("Error signing in with Google:", error)
       if (error.code === "permission-denied") {
@@ -457,7 +251,7 @@ export default function LoginPage() {
             {globalMessage && (
               <div
                 className={`border-l-4 rounded-lg px-4 py-2 w-full sm:w-3/4 ${
-                  globalMessage.includes("successful")
+                  globalMessage.includes("successful") || globalMessage.includes("verified successfully")
                     ? "bg-green-100 border-green-500 text-green-500"
                     : "bg-red-100 border-red-500 text-red-500"
                 }`}
@@ -466,189 +260,69 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="flex gap-4 w-full sm:w-3/4 justify-center mb-4">
-              <button
-                onClick={() => {
-                  setLoginMethod("email")
-                  resetFields()
-                }}
-                className={`px-4 py-2 rounded-lg transition-colors duration-150 ${
-                  loginMethod === "email" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Email
-              </button>
-              <button
-                onClick={() => {
-                  setLoginMethod("phone")
-                  resetFields()
-                }}
-                className={`px-4 py-2 rounded-lg transition-colors duration-150 ${
-                  loginMethod === "phone" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Phone
-              </button>
-            </div>
-
-            {loginMethod === "email" ? (
-              <form onSubmit={handleLogin} className="flex flex-col gap-8 w-full sm:w-3/4">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="col-span-2 flex flex-col gap-1 justify-center">
-                    <label htmlFor="username">Username</label>
-                    <input
-                      type="text"
-                      name="username"
-                      id="username"
-                      value={form.username}
-                      className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                      placeholder="Enter your username"
-                      onChange={handleInputChange}
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="col-span-2 flex flex-col gap-1 justify-center">
-                    <label htmlFor="password">Password</label>
-                    <input
-                      type="password"
-                      name="password"
-                      id="password"
-                      value={form.password}
-                      className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                      placeholder="Enter your password"
-                      onChange={handleInputChange}
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* Remember Me Checkbox */}
-                  <div className="col-span-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="remember-me"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="remember-me" className="text-sm text-gray-600">
-                        Remember me
-                      </label>
-                    </div>
-                    <Link
-                      href="/forgot-password"
-                      className="text-sm text-blue-500 hover:underline hover:underline-offset-4"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 items-center mt-2">
-                  <button
-                    type="submit"
+            <form onSubmit={handleLogin} className="flex flex-col gap-8 w-full sm:w-3/4">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="col-span-2 flex flex-col gap-1 justify-center">
+                  <label htmlFor="username">Username</label>
+                  <input
+                    type="text"
+                    name="username"
+                    id="username"
+                    value={form.username}
+                    className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150"
+                    placeholder="Enter your username"
+                    onChange={handleInputChange}
                     disabled={isLoading}
-                    className="px-4 py-2 rounded-2xl w-full bg-blue-500 text-white transition-colors duration-150 hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? "Signing in..." : "Sign in"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <form
-                onSubmit={showOTPInput ? handleVerifyOTP : handlePhoneLogin}
-                className="flex flex-col gap-8 w-full sm:w-3/4"
-              >
-                <div className="grid grid-cols-2 gap-6">
-                  {!showOTPInput ? (
-                    <div className="col-span-2 flex flex-col gap-1">
-                      <label htmlFor="phone">Phone number</label>
-                      <div className="relative flex items-center gap-2">
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                            className="flex items-center gap-2 border-b-2 py-2 px-3 min-w-[120px]"
-                            disabled={isLoading}
-                          >
-                            <span>{selectedCountry.flag}</span>
-                            <span>{selectedCountry.phoneCode}</span>
-                            <ChevronDown className="w-4 h-4" />
-                          </button>
-
-                          {showCountryDropdown && (
-                            <div className="absolute top-full left-0 mt-1 w-64 max-h-60 overflow-y-auto bg-white border rounded-lg shadow-lg z-50">
-                              {countries.map((country) => (
-                                <button
-                                  key={country.code}
-                                  type="button"
-                                  className="flex items-center gap-3 w-full px-4 py-2 hover:bg-gray-100 text-left"
-                                  onClick={() => handleCountrySelect(country)}
-                                >
-                                  <span>{country.flag}</span>
-                                  <span className="flex-1">{country.name}</span>
-                                  <span className="text-gray-500">{country.phoneCode}</span>
-                                  {selectedCountry.code === country.code && <Check className="w-4 h-4 text-blue-500" />}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          type="tel"
-                          name="phone"
-                          id="phone"
-                          className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150 mt-1 flex-1"
-                          placeholder="Enter your phone number"
-                          value={form.phone}
-                          onChange={handleInputChange}
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="col-span-2 flex flex-col gap-1">
-                      <label htmlFor="otp">Verification code</label>
-                      <input
-                        type="text"
-                        name="otp"
-                        id="otp"
-                        maxLength={6}
-                        className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                        placeholder="Enter 6-digit code"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                        disabled={isLoading}
-                      />
-                    </div>
-                  )}
+                  />
                 </div>
 
-                <div className="flex gap-4 items-center mt-2">
-                  <button
-                    type="submit"
+                <div className="col-span-2 flex flex-col gap-1 justify-center">
+                  <label htmlFor="password">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    id="password"
+                    value={form.password}
+                    className="border-b-2 py-2 outline-none focus:border-blue-500 transition-colors duration-150"
+                    placeholder="Enter your password"
+                    onChange={handleInputChange}
                     disabled={isLoading}
-                    className="px-4 py-2 rounded-2xl w-full bg-blue-500 text-white transition-colors duration-150 hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? "Processing..." : showOTPInput ? "Verify Code" : "Send Code"}
-                  </button>
+                  />
                 </div>
 
-                {showOTPInput && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowOTPInput(false)
-                      setOtp("")
-                    }}
-                    className="text-blue-500 text-sm hover:underline"
+                {/* Remember Me Checkbox */}
+                <div className="col-span-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="remember-me"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="remember-me" className="text-sm text-gray-600">
+                      Remember me
+                    </label>
+                  </div>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-blue-500 hover:underline hover:underline-offset-4"
                   >
-                    Change phone number
-                  </button>
-                )}
-              </form>
-            )}
+                    Forgot password?
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-center mt-2">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-2xl w-full bg-blue-500 text-white transition-colors duration-150 hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? "Signing in..." : "Sign in"}
+                </button>
+              </div>
+            </form>
 
             <div className="w-full flex items-center gap-4">
               <div className="flex-1 h-[1px] bg-gray-300"></div>
@@ -701,8 +375,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      <div ref={recaptchaContainerRef} className="hidden"></div>
     </div>
   )
 }
-

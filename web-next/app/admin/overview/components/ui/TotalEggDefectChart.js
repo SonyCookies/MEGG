@@ -21,18 +21,26 @@ export function TotalEggDefectChart({ timeFrame }) {
         setLoading(true)
         let chartData = await getTotalDefectData(timeFrame)
 
-        // Ensure we have data for all days
+        // Ensure we have data for all periods
         if (timeFrame === "daily") {
           const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
           chartData = daysOfWeek.map((day) => {
             const existingData = chartData.find((d) => d.day === day)
             return existingData || { day, defects: 0 }
           })
+        } else if (timeFrame === "monthly") {
+          // Ensure we have data for all months
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+
+          // Create a complete dataset with all months
+          chartData = months.map((month) => {
+            const existingData = chartData.find((d) => d.month === month)
+            return existingData || { month, defects: 0 }
+          })
         }
 
         setData(chartData)
         setLoading(false)
-        // Reset animation when data changes
         setAnimationProgress(0)
       } catch (err) {
         console.error("Error fetching total defect data:", err)
@@ -57,7 +65,7 @@ export function TotalEggDefectChart({ timeFrame }) {
 
     // Start the animation when data is loaded
     if (data.length > 0 && !loading) {
-      const animationDuration = 1500 // 1.5 seconds
+      const animationDuration = 4000 // 1.5 seconds
       const startTime = Date.now()
 
       const animateChart = () => {
@@ -145,20 +153,53 @@ export function TotalEggDefectChart({ timeFrame }) {
   // Calculate maxDefects with a fallback to 1 to avoid division by zero
   const maxDefects = Math.max(1, ...data.map((d) => d.defects))
 
-  // Create a continuous line path
-  const linePath = data
-    .map((d, i) => {
+  // Create line segments directly connecting each point
+  const createLineSegments = () => {
+    const segments = []
+
+    for (let i = 0; i < data.length - 1; i++) {
+      const x1 = (i / (data.length - 1)) * chartWidth
+      const y1 = chartHeight - ((data[i].defects || 0) / maxDefects) * chartHeight
+
+      const x2 = ((i + 1) / (data.length - 1)) * chartWidth
+      const y2 = chartHeight - ((data[i + 1].defects || 0) / maxDefects) * chartHeight
+
+      segments.push(
+        <line
+          key={i}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="#fb510f"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            opacity: animationProgress > i / data.length ? 1 : 0,
+            transition: "opacity 0.3s ease",
+          }}
+        />,
+      )
+    }
+
+    return segments
+  }
+
+  // Create area path
+  const createAreaPath = () => {
+    let path = `M0,${chartHeight} `
+
+    data.forEach((d, i) => {
       const x = (i / (data.length - 1)) * chartWidth
-      // Ensure y is a valid number by using a fallback when defects is 0
       const y = chartHeight - ((d.defects || 0) / maxDefects) * chartHeight
-      return `${i === 0 ? "M" : "L"}${x},${y}`
+      path += `L${x},${y} `
     })
-    .join(" ")
 
-  const areaPath = `${linePath} L${chartWidth},${chartHeight} L0,${chartHeight} Z`
+    path += `L${chartWidth},${chartHeight} Z`
 
-  // Check if all defects are 0
-  const allZeroDefects = data.every((d) => d.defects === 0)
+    return path
+  }
 
   return (
     <div className="relative w-full h-[300px]" ref={chartRef}>
@@ -174,30 +215,16 @@ export function TotalEggDefectChart({ timeFrame }) {
           </linearGradient>
         </defs>
         <g transform={`translate(${padding.left}, ${padding.top})`}>
-          {/* Only render the line if there's actual data */}
-          {!allZeroDefects && (
-            <>
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#fb510f"
-                strokeWidth="3"
-                strokeDasharray={chartWidth}
-                strokeDashoffset={chartWidth * (1 - animationProgress) - 3}
-              />
-              <path
-                d={areaPath}
-                fill="url(#defectLineGradient)"
-                opacity={Math.min(1, (chartWidth - (chartWidth * (1 - animationProgress) - 3)) / chartWidth)}
-              />
-            </>
-          )}
+          {/* Draw the area fill */}
+          <path d={createAreaPath()} fill="url(#defectLineGradient)" opacity={animationProgress} />
 
-          {/* Always render the data points and labels */}
+          {/* Draw line segments directly between points */}
+          {createLineSegments()}
+
+          {/* Data points */}
           {data.map((d, i) => {
             const x = (i / (data.length - 1)) * chartWidth
-            // For zero data, position all points at the bottom of the chart
-            const y = allZeroDefects ? chartHeight : chartHeight - ((d.defects || 0) / maxDefects) * chartHeight
+            const y = chartHeight - ((d.defects || 0) / maxDefects) * chartHeight
             const pointProgress = Math.min(1, animationProgress * data.length * 1.5 - i)
 
             return (
@@ -231,13 +258,6 @@ export function TotalEggDefectChart({ timeFrame }) {
         </g>
       </svg>
 
-      {/* Show a "No data" message when all defects are zero */}
-      {allZeroDefects && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-gray-500">No defect data for this period</div>
-        </div>
-      )}
-
       {hoverData && (
         <div
           className="absolute bg-white p-3 rounded-xl shadow-lg text-sm border border-gray-200 transition-all duration-300 ease-in-out"
@@ -256,4 +276,3 @@ export function TotalEggDefectChart({ timeFrame }) {
     </div>
   )
 }
-
