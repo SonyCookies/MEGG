@@ -1,4 +1,4 @@
-// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\sync.js
+// D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next-frontend\app\sync.tsx
 
 import { db, storage } from "./firebaseConfig"
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore"

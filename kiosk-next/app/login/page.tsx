@@ -1,14 +1,21 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+
 import React from "react"
 
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Shield, Lock, Key, AlertCircle, Check, XCircle, Keyboard, ChevronRight, Loader } from "lucide-react"
 import { addAccessLog } from "../utils/logging"
 
-// Add this improved debug helper function at the top of your component
+// ==========================================
+// Helper Functions
+// ==========================================
+
+/**
+ * Debug helper for machine ID troubleshooting
+ */
 const debugMachineId = (id: string, source: string) => {
   console.log(`[DEBUG ${source}] Machine ID: "${id}"`)
   console.log(`[DEBUG ${source}] Length: ${id.length}`)
@@ -18,12 +25,12 @@ const debugMachineId = (id: string, source: string) => {
   )
   console.log(`[DEBUG ${source}] Parts:`, id.split("-"))
 
-  // Check for any whitespace at the beginning or end
+  // Check for whitespace
   if (id !== id.trim()) {
     console.warn(`[DEBUG ${source}] WARNING: Machine ID contains whitespace at beginning or end`)
   }
 
-  // Check for any non-visible characters
+  // Check for non-visible characters
   const nonVisibleChars = [...id].filter((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) > 126)
   if (nonVisibleChars.length > 0) {
     console.warn(
@@ -33,25 +40,24 @@ const debugMachineId = (id: string, source: string) => {
   }
 }
 
-// Replace the cleanMachineId function with this improved version that handles O/0 confusion
+/**
+ * Cleans and formats machine ID
+ */
 const cleanMachineId = (id: string): string => {
-  // Remove all whitespace
-  const cleaned = id.replace(/\s+/g, "")
+  // Remove whitespace and handle O/0 confusion
+  const cleaned = id.replace(/\s+/g, "").replace(/[oO]/g, "0")
 
-  // Replace any 'O' or 'o' with '0' (zero) - common OCR/visual confusion
-  const corrected = cleaned.replace(/[oO]/g, "0")
-
-  // Check if we have a properly formatted ID with dashes
-  if (/^MEGG-\d{4}-\d{3}-\d{3}$/.test(corrected)) {
-    console.log(`[DEBUG cleanMachineId] ID already in correct format: "${corrected}"`)
-    return corrected
+  // Check if already in correct format
+  if (/^MEGG-\d{4}-\d{3}-\d{3}$/.test(cleaned)) {
+    console.log(`[DEBUG cleanMachineId] ID already in correct format: "${cleaned}"`)
+    return cleaned
   }
 
   // Split by dashes and filter out empty parts
-  const parts = corrected.split("-").filter((p) => p.length > 0)
+  const parts = cleaned.split("-").filter((p) => p.length > 0)
 
   if (parts.length === 4 && parts[0] === "MEGG") {
-    // We have the right number of parts, just make sure they're clean
+    // We have the right number of parts
     const formattedId = `MEGG-${parts[1]}-${parts[2]}-${parts[3]}`
     console.log(`[DEBUG cleanMachineId] Reformatted from parts: "${formattedId}"`)
     return formattedId
@@ -65,57 +71,127 @@ const cleanMachineId = (id: string): string => {
     }
   }
 
-  // If we can't parse it properly, try to reconstruct it from the original
-  if (corrected.startsWith("MEGG")) {
-    const remainder = corrected.substring(4)
+  // Try to reconstruct from the original
+  if (cleaned.startsWith("MEGG")) {
+    const remainder = cleaned.substring(4)
     if (remainder.length >= 10) {
-      // At least enough characters for YYYY-SSS-UUU
       const formattedId = `MEGG-${remainder.substring(0, 4)}-${remainder.substring(4, 7)}-${remainder.substring(7, 10)}`
       console.log(`[DEBUG cleanMachineId] Reconstructed from original: "${formattedId}"`)
       return formattedId
     }
   }
 
-  // If all else fails, return the cleaned string
-  console.log(`[DEBUG cleanMachineId] Could not format properly, returning cleaned: "${corrected}"`)
-  return corrected
+  // Return cleaned string if all else fails
+  console.log(`[DEBUG cleanMachineId] Could not format properly, returning cleaned: "${cleaned}"`)
+  return cleaned
 }
 
+// ==========================================
+// Types
+// ==========================================
+type InputMode = "machineId" | "pin"
+type MachineIdPart = "year" | "series" | "unit"
+
+interface LoginState {
+  isLoaded: boolean
+  machineId: string
+  savedMachineId: string
+  showSavedModal: boolean
+  pin: string
+  loading: boolean
+  error: string
+  success: string
+  inputMode: InputMode
+  machineIdPart: MachineIdPart
+  yearInput: string
+  seriesInput: string
+  unitInput: string
+  isMachineIdFocused: boolean
+  showVerifyModal: boolean
+}
+
+// ==========================================
+// Constants
+// ==========================================
+const NUMBER_PAD = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["C", "0", "⌫"],
+]
+
+// ==========================================
+// Main Component
+// ==========================================
 export default function LoginPage() {
   const router = useRouter()
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [machineId, setMachineId] = useState("")
-  const [savedMachineId, setSavedMachineId] = useState("")
-  const [showSavedModal, setShowSavedModal] = useState(false)
-  const [pin, setPin] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const [inputMode, setInputMode] = useState<"machineId" | "pin">("machineId")
-  const [machineIdPart, setMachineIdPart] = useState<"year" | "series" | "unit">("year")
-  const [yearInput, setYearInput] = useState("")
-  const [seriesInput, setSeriesInput] = useState("")
-  const [unitInput, setUnitInput] = useState("")
-  const [isMachineIdFocused, setIsMachineIdFocused] = useState(true)
   const machineIdInputRef = useRef<HTMLInputElement>(null)
-  const [showVerifyModal, setShowVerifyModal] = useState(false)
 
+  // State management
+  const [state, setState] = useState<LoginState>({
+    isLoaded: false,
+    machineId: "",
+    savedMachineId: "",
+    showSavedModal: false,
+    pin: "",
+    loading: false,
+    error: "",
+    success: "",
+    inputMode: "machineId",
+    machineIdPart: "year",
+    yearInput: "",
+    seriesInput: "",
+    unitInput: "",
+    isMachineIdFocused: true,
+    showVerifyModal: false,
+  })
+
+  // Destructure state for convenience
+  const {
+    isLoaded,
+    machineId,
+    savedMachineId,
+    showSavedModal,
+    pin,
+    loading,
+    error,
+    success,
+    inputMode,
+    machineIdPart,
+    yearInput,
+    seriesInput,
+    unitInput,
+    isMachineIdFocused,
+    showVerifyModal,
+  } = state
+
+  // Helper function to update state
+  const updateState = (updates: Partial<LoginState>) => {
+    setState((prev) => ({ ...prev, ...updates }))
+  }
+
+  // ==========================================
+  // Effects
+  // ==========================================
+
+  // Initial load effect
   useEffect(() => {
     // Trigger animations after component mounts
-    const timer = setTimeout(() => setIsLoaded(true), 100)
+    const timer = setTimeout(() => updateState({ isLoaded: true }), 100)
 
+    // Check for saved machine ID
     const saved = localStorage.getItem("machineId")
     if (saved) {
-      setSavedMachineId(saved)
-      setShowSavedModal(true)
+      updateState({
+        savedMachineId: saved,
+        showSavedModal: true,
+      })
     }
 
-    return () => {
-      clearTimeout(timer)
-    }
+    return () => clearTimeout(timer)
   }, [])
 
-  // Effect to update machineId when parts change
+  // Update machineId when parts change
   useEffect(() => {
     const parts = ["MEGG"]
     if (yearInput) parts.push(yearInput)
@@ -123,19 +199,25 @@ export default function LoginPage() {
     if (yearInput && seriesInput && unitInput) parts.push(unitInput)
 
     const newMachineId = parts.join("-")
-    setMachineId(newMachineId)
+    updateState({ machineId: newMachineId })
 
     // Debug log
     debugMachineId(newMachineId, "useEffect")
   }, [yearInput, seriesInput, unitInput])
 
-  // Effect to switch to PIN mode when machine ID is complete
+  // Switch to PIN mode when machine ID is complete
   useEffect(() => {
     if (yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3) {
-      setInputMode("pin")
-      setIsMachineIdFocused(false)
+      updateState({
+        inputMode: "pin",
+        isMachineIdFocused: false,
+      })
     }
   }, [yearInput, seriesInput, unitInput])
+
+  // ==========================================
+  // Event Handlers
+  // ==========================================
 
   const handleUseSavedMachine = () => {
     // Parse the saved machine ID into its components
@@ -144,24 +226,26 @@ export default function LoginPage() {
 
     const parts = cleanSavedMachineId.split("-")
     if (parts.length === 4) {
-      setYearInput(parts[1].trim())
-      setSeriesInput(parts[2].trim())
-      setUnitInput(parts[3].trim())
+      updateState({
+        yearInput: parts[1].trim(),
+        seriesInput: parts[2].trim(),
+        unitInput: parts[3].trim(),
+        machineId: cleanSavedMachineId,
+        inputMode: "pin",
+        isMachineIdFocused: false,
+        showSavedModal: false,
+      })
     }
-    setMachineId(cleanSavedMachineId)
 
     // Debug log after setting
     setTimeout(() => {
       debugMachineId(machineId, "handleUseSavedMachine-after")
     }, 0)
-
-    setInputMode("pin")
-    setIsMachineIdFocused(false)
-    setShowSavedModal(false)
   }
 
   const handleUseDifferentMachine = () => {
-    setShowSavedModal(false)
+    updateState({ showSavedModal: false })
+
     // Focus on the machine ID input
     setTimeout(() => {
       if (machineIdInputRef.current) {
@@ -172,8 +256,10 @@ export default function LoginPage() {
 
   const handleClearSavedMachine = () => {
     localStorage.removeItem("machineId")
-    setSavedMachineId("")
-    setShowSavedModal(false)
+    updateState({
+      savedMachineId: "",
+      showSavedModal: false,
+    })
   }
 
   const handleMachineIdInput = (digit: string) => {
@@ -185,99 +271,107 @@ export default function LoginPage() {
       if (yearInput.length < 4) {
         const newYearInput = yearInput + cleanDigit
         console.log(`[DEBUG handleMachineIdInput] New yearInput: "${newYearInput}"`)
-        setYearInput(newYearInput)
+        updateState({ yearInput: newYearInput })
+
         if (yearInput.length === 3) {
           // Automatically move to series after completing year
-          setMachineIdPart("series")
+          updateState({ machineIdPart: "series" })
         }
       }
     } else if (machineIdPart === "series") {
       if (seriesInput.length < 3) {
         const newSeriesInput = seriesInput + cleanDigit
         console.log(`[DEBUG handleMachineIdInput] New seriesInput: "${newSeriesInput}"`)
-        setSeriesInput(newSeriesInput)
+        updateState({ seriesInput: newSeriesInput })
+
         if (seriesInput.length === 2) {
           // Automatically move to unit after completing series
-          setMachineIdPart("unit")
+          updateState({ machineIdPart: "unit" })
         }
       }
     } else if (machineIdPart === "unit") {
       if (unitInput.length < 3) {
         const newUnitInput = unitInput + cleanDigit
         console.log(`[DEBUG handleMachineIdInput] New unitInput: "${newUnitInput}"`)
-        setUnitInput(newUnitInput)
-        if (unitInput.length === 2) {
-          // Will automatically switch to PIN mode via useEffect
-        }
+        updateState({ unitInput: newUnitInput })
       }
     }
   }
 
   const handleMachineIdBackspace = () => {
     if (machineIdPart === "year" && yearInput.length > 0) {
-      setYearInput((prev) => prev.slice(0, -1))
+      updateState({ yearInput: yearInput.slice(0, -1) })
     } else if (machineIdPart === "series") {
       if (seriesInput.length > 0) {
-        setSeriesInput((prev) => prev.slice(0, -1))
+        updateState({ seriesInput: seriesInput.slice(0, -1) })
       } else {
         // Go back to year if series is empty
-        setMachineIdPart("year")
+        updateState({ machineIdPart: "year" })
       }
     } else if (machineIdPart === "unit") {
       if (unitInput.length > 0) {
-        setUnitInput((prev) => prev.slice(0, -1))
+        updateState({ unitInput: unitInput.slice(0, -1) })
       } else {
         // Go back to series if unit is empty
-        setMachineIdPart("series")
+        updateState({ machineIdPart: "series" })
       }
     }
   }
 
   const handleMachineIdClear = () => {
     if (machineIdPart === "year") {
-      setYearInput("")
+      updateState({ yearInput: "" })
     } else if (machineIdPart === "series") {
-      setSeriesInput("")
+      updateState({ seriesInput: "" })
     } else if (machineIdPart === "unit") {
-      setUnitInput("")
+      updateState({ unitInput: "" })
     }
   }
 
   const handlePinInput = (digit: string) => {
     if (loading) return
-    setError("")
 
     if (pin.length < 4) {
-      setPin((prev) => prev + digit)
+      updateState({
+        error: "",
+        pin: pin + digit,
+      })
     }
   }
 
   const handlePinBackspace = () => {
     if (loading) return
-    setError("")
-    setPin((prev) => prev.slice(0, -1))
+    updateState({
+      error: "",
+      pin: pin.slice(0, -1),
+    })
   }
 
   const handlePinClear = () => {
     if (loading) return
-    setError("")
-    setPin("")
+    updateState({
+      error: "",
+      pin: "",
+    })
   }
 
   const handleSwitchToMachineId = () => {
-    setInputMode("machineId")
-    setIsMachineIdFocused(true)
+    let newMachineIdPart: MachineIdPart = "year"
 
-    // If machine ID is complete, start editing from the unit part
+    // Determine which part to edit based on completion
     if (yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3) {
-      setMachineIdPart("unit")
+      newMachineIdPart = "unit"
     } else if (yearInput.length === 4 && seriesInput.length === 3) {
-      setMachineIdPart("unit")
+      newMachineIdPart = "unit"
     } else if (yearInput.length === 4) {
-      setMachineIdPart("series")
-    } else {
-      setMachineIdPart("year")
+      newMachineIdPart = "series"
     }
+
+    updateState({
+      inputMode: "machineId",
+      isMachineIdFocused: true,
+      machineIdPart: newMachineIdPart,
+    })
 
     setTimeout(() => {
       if (machineIdInputRef.current) {
@@ -288,22 +382,21 @@ export default function LoginPage() {
 
   const handleSwitchToPin = () => {
     if (yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3) {
-      setInputMode("pin")
-      setIsMachineIdFocused(false)
+      updateState({
+        inputMode: "pin",
+        isMachineIdFocused: false,
+      })
     } else {
-      setError("Please complete the Machine ID first")
+      updateState({ error: "Please complete the Machine ID first" })
     }
   }
 
-  // Replace the handleLogin function with this updated version
   const handleLogin = async () => {
     // Show the verify modal first
-    setShowVerifyModal(true)
+    updateState({ showVerifyModal: true })
 
     // Ensure machineId is properly formatted and trimmed
     let formattedMachineId = machineId.trim()
-
-    // Apply thorough cleaning to ensure dashes are preserved
     formattedMachineId = cleanMachineId(formattedMachineId)
 
     // Debug log before login
@@ -319,19 +412,23 @@ export default function LoginPage() {
       }
     }
 
-    // Also create a simplified version without hyphens for debugging
+    // Create a simplified version without hyphens for debugging
     const simplifiedId = formattedMachineId.replace(/-/g, "")
     console.log(`[DEBUG handleLogin] Simplified ID (no hyphens): "${simplifiedId}"`)
 
     if (!formattedMachineId || !pin) {
-      setError("Please enter both Machine ID and PIN")
-      setShowVerifyModal(false)
+      updateState({
+        error: "Please enter both Machine ID and PIN",
+        showVerifyModal: false,
+      })
       return
     }
 
     try {
-      setLoading(true)
-      setError("")
+      updateState({
+        loading: true,
+        error: "",
+      })
 
       console.log(`[DEBUG handleLogin] Sending login request with machineId: "${formattedMachineId}" and PIN: "${pin}"`)
 
@@ -341,7 +438,7 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          machineId: formattedMachineId, // This should now always have dashes
+          machineId: formattedMachineId,
           pin,
           // Also send alternative formats to help debug
           machineIdAlternatives: {
@@ -361,15 +458,18 @@ export default function LoginPage() {
 
       localStorage.setItem("machineId", formattedMachineId)
 
-      setSuccess("Login successful!")
+      updateState({ success: "Login successful!" })
+
       setTimeout(() => {
-        setShowVerifyModal(false)
+        updateState({ showVerifyModal: false })
         router.push("/home")
       }, 1500)
     } catch (err: any) {
       console.error("Error during login:", err)
-      setError(err.message || "An error occurred. Please try again.")
-      setShowVerifyModal(false)
+      updateState({
+        error: err.message || "An error occurred. Please try again.",
+        showVerifyModal: false,
+      })
 
       await addAccessLog(
         {
@@ -381,19 +481,24 @@ export default function LoginPage() {
         formattedMachineId,
       )
     } finally {
-      setLoading(false)
+      updateState({ loading: false })
     }
   }
+
+  // ==========================================
+  // UI Components
+  // ==========================================
 
   // MachineIdInput Component
   function MachineIdInput() {
     const handleFocus = () => {
-      setInputMode("machineId")
-      setIsMachineIdFocused(true)
+      updateState({
+        inputMode: "machineId",
+        isMachineIdFocused: true,
+      })
     }
 
     // Create segments for the machine ID visualization
-    const segments = ["MEGG"]
     const parts = ["MEGG"]
     if (yearInput) parts.push(yearInput)
     if (yearInput && seriesInput) parts.push(seriesInput)
@@ -412,7 +517,7 @@ export default function LoginPage() {
           ></div>
 
           <div className="relative z-10 h-full flex flex-col">
-            {/* Header with back button and title - moved to left column */}
+            {/* Header with back button and title */}
             <div className="flex items-center mb-3">
               <Link
                 href="/"
@@ -570,13 +675,6 @@ export default function LoginPage() {
 
   // PinEntry Component
   function PinEntry() {
-    const numberPad = [
-      ["1", "2", "3"],
-      ["4", "5", "6"],
-      ["7", "8", "9"],
-      ["C", "0", "⌫"],
-    ]
-
     const renderPinDisplay = () => (
       <div className="flex gap-2 justify-center">
         {[...Array(4)].map((_, i) => {
@@ -585,11 +683,11 @@ export default function LoginPage() {
             <div
               key={i}
               className={`relative w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold transition-all duration-300 overflow-hidden
-        ${
-          isFilled
-            ? "border-none bg-gradient-to-br from-[#0e5f97] to-[#0c4d7a] text-white shadow-[0_0_10px_rgba(14,95,151,0.4)]"
-            : "border-2 border-[#0e5f97]/20 bg-white/50 text-transparent"
-        }`}
+                ${
+                  isFilled
+                    ? "border-none bg-gradient-to-br from-[#0e5f97] to-[#0c4d7a] text-white shadow-[0_0_10px_rgba(14,95,151,0.4)]"
+                    : "border-2 border-[#0e5f97]/20 bg-white/50 text-transparent"
+                }`}
             >
               {/* Inner glow effect */}
               {isFilled && <div className="absolute inset-0 bg-[#0e5f97] opacity-20 animate-pulse"></div>}
@@ -687,7 +785,7 @@ export default function LoginPage() {
                 }}
               ></div>
 
-              {numberPad.map((row, rowIndex) => (
+              {NUMBER_PAD.map((row, rowIndex) => (
                 <React.Fragment key={rowIndex}>
                   {row.map((digit, colIndex) => {
                     // Special case: transform the "0" button into a login button when PIN is complete
@@ -890,7 +988,7 @@ export default function LoginPage() {
     return (
       <div className="fixed inset-0 z-50">
         {/* Backdrop with blur effect */}
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setError("")}></div>
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => updateState({ error: "" })}></div>
 
         {/* Modal content */}
         <div className="flex justify-center mt-8">
@@ -904,7 +1002,7 @@ export default function LoginPage() {
               <p className="text-red-600 mb-4">{error}</p>
 
               <button
-                onClick={() => setError("")}
+                onClick={() => updateState({ error: "" })}
                 className="px-6 py-2 bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] hover:from-[#0c4d7a] hover:to-[#0a3d62] text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
               >
                 OK

@@ -1,4 +1,4 @@
-//D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\contexts\WebSocketContext.js
+//D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next-frontend\app\contexts\WebSocketContext.tsx
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react"

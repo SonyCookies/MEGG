@@ -1,4 +1,4 @@
-//D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next\app\contexts\InternetConnectionContext.js
+//D:\4TH YEAR\CAPSTONE\MEGG\kiosk-next-frontend\app\contexts\InternetConnectionContext.js
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"

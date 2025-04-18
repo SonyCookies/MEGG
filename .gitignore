@@ -13,6 +13,15 @@ ai-backend/splitted-dataset/
 ai-backend/model/
 ai-backend/venv/
 
+# AI Training Backend specific
+ai-training-backend/dataset/
+ai-training-backend/splitted-dataset/
+ai-training-backend/model/
+ai-training-backend/model_weights/
+ai-training-backend/venv/
+ai-training-backend/__pycache__/
+
+
 # Node.js related
 node_modules/
 .next/

@@ -15,6 +15,7 @@ import {
   ArrowRight,
   ChevronLeft,
   CheckCircle,
+  AlertCircle
 } from "lucide-react"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../firebaseConfig"
