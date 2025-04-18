@@ -21,6 +21,7 @@ ai-training-backend/model_weights/
 ai-training-backend/venv/
 ai-training-backend/__pycache__/
 
+ai-inference-backend/models/
 
 # Node.js related
 node_modules/
