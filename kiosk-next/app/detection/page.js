@@ -1,3 +1,5 @@
+// D:\4THYEAR\CAPSTONE\MEGG\kiosk-next\app\detection\page.js
+
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"

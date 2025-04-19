@@ -2,16 +2,25 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Wifi, WifiOff, Plug, PlugIcon as PlugOff, Sun, Moon } from "lucide-react"
 import { useWebSocket, useInternetConnection } from "../contexts/NetworkContext"
 import StatusIndicator from "./components/status-indicator"
 import NavigationCard from "./components/navigation-card"
+import EggLoading from "../components/egg-loading"
 
 export default function Home() {
+  const router = useRouter()
   const { readyState } = useWebSocket()
   const isOnline = useInternetConnection()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isDaytime, setIsDaytime] = useState(true)
+  const [isNavigating, setIsNavigating] = useState(false)
+  const [navigationContext, setNavigationContext] = useState({
+    title: "",
+    icon: "",
+    destination: "",
+  })
 
   // Update time every minute
   useEffect(() => {
@@ -85,9 +94,38 @@ export default function Home() {
     },
   ]
 
+  // Handle navigation with loading animation
+  const handleNavigation = (href: string, title: string, icon: string) => {
+    setNavigationContext({
+      title,
+      icon,
+      destination: href,
+    })
+    setIsNavigating(true)
+  }
+
+  // Complete navigation after loading animation
+  const completeNavigation = () => {
+    setIsNavigating(false)
+    router.push(navigationContext.destination)
+  }
+
   return (
     <div className="h-screen overflow-hidden bg-[#0e5f97] p-3 sm:p-4 md:p-6 relative">
-    {/* Background pattern */}
+      {/* Loading overlay */}
+      {isNavigating && (
+        <EggLoading
+          isLoading={isNavigating}
+          onComplete={completeNavigation}
+          context={{
+            title: navigationContext.title,
+            icon: navigationContext.icon,
+            destination: navigationContext.destination,
+          }}
+        />
+      )}
+
+      {/* Background pattern */}
       <BackgroundElements />
 
       <div className="max-w-3xl mx-auto relative">
@@ -142,13 +180,9 @@ export default function Home() {
         {/* Navigation Cards */}
         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {navigationCards.map((card, index) => (
-            <NavigationCard
-              key={index}
-              href={card.href}
-              icon={card.icon}
-              title={card.title}
-              accentPosition={card.accentPosition}
-            />
+            <div key={index} onClick={() => handleNavigation(card.href, card.title, card.icon)}>
+              <NavigationCard href="#" icon={card.icon} title={card.title} accentPosition={card.accentPosition} />
+            </div>
           ))}
         </div>
 
@@ -159,7 +193,7 @@ export default function Home() {
   )
 }
 
-// Extracted components
+
 function BackgroundElements() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
