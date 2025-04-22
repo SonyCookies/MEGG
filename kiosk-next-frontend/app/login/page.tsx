@@ -8,6 +8,41 @@ import Image from "next/image"
 import { Shield, Key, AlertCircle, Check, XCircle, Keyboard, ChevronRight, ArrowLeft, Loader, Lock } from "lucide-react"
 
 // ==========================================
+// Types
+// ==========================================
+type InputMode = "machineId" | "pin"
+type MachineIdPart = "year" | "series" | "unit"
+
+interface LoginState {
+  isLoaded: boolean
+  machineId: string
+  savedMachineId: string
+  showSavedModal: boolean
+  pin: string
+  loading: boolean
+  error: string
+  success: string
+  inputMode: InputMode
+  machineIdPart: MachineIdPart
+  yearInput: string
+  seriesInput: string
+  unitInput: string
+  isMachineIdFocused: boolean
+  showVerifyModal: boolean
+  showPinErrorModal: boolean
+}
+
+// ==========================================
+// Constants
+// ==========================================
+const NUMBER_PAD = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["C", "0", "⌫"],
+]
+
+// ==========================================
 // Helper Functions
 // ==========================================
 
@@ -49,40 +84,12 @@ const cleanMachineId = (id: string): string => {
   return cleaned
 }
 
-// ==========================================
-// Types
-// ==========================================
-type InputMode = "machineId" | "pin"
-type MachineIdPart = "year" | "series" | "unit"
-
-interface LoginState {
-  isLoaded: boolean
-  machineId: string
-  savedMachineId: string
-  showSavedModal: boolean
-  pin: string
-  loading: boolean
-  error: string
-  success: string
-  inputMode: InputMode
-  machineIdPart: MachineIdPart
-  yearInput: string
-  seriesInput: string
-  unitInput: string
-  isMachineIdFocused: boolean
-  showVerifyModal: boolean
-  showPinErrorModal: boolean
+/**
+ * Check if machine ID is complete
+ */
+const isMachineIdComplete = (yearInput: string, seriesInput: string, unitInput: string): boolean => {
+  return yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3
 }
-
-// ==========================================
-// Constants
-// ==========================================
-const NUMBER_PAD = [
-  ["1", "2", "3"],
-  ["4", "5", "6"],
-  ["7", "8", "9"],
-  ["C", "0", "⌫"],
-]
 
 // ==========================================
 // Main Component
@@ -170,7 +177,7 @@ export default function LoginPage() {
 
   // Switch to PIN mode when machine ID is complete
   useEffect(() => {
-    if (yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3) {
+    if (isMachineIdComplete(yearInput, seriesInput, unitInput)) {
       updateState({
         inputMode: "pin",
         isMachineIdFocused: false,
@@ -334,7 +341,7 @@ export default function LoginPage() {
   }
 
   const handleSwitchToPin = () => {
-    if (yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3) {
+    if (isMachineIdComplete(yearInput, seriesInput, unitInput)) {
       updateState({
         inputMode: "pin",
         isMachineIdFocused: false,
@@ -348,6 +355,15 @@ export default function LoginPage() {
   }
 
   const handleLogin = async () => {
+    // Check if machine ID is complete before proceeding
+    if (!isMachineIdComplete(yearInput, seriesInput, unitInput)) {
+      updateState({
+        error: "Please complete the Machine ID first",
+        showPinErrorModal: true,
+      })
+      return
+    }
+
     // Show the verify modal first
     updateState({ showVerifyModal: true })
 
@@ -412,9 +428,9 @@ export default function LoginPage() {
         updateState({ showVerifyModal: false })
         router.push("/home")
       }, 1500)
-    } catch (err: any) {
+    } catch (err: unknown) {
       updateState({
-        error: err.message || "An error occurred. Please try again.",
+        error: err instanceof Error ? err.message : "An error occurred. Please try again.",
         showVerifyModal: false,
         showPinErrorModal: true,
       })
@@ -784,7 +800,7 @@ export default function LoginPage() {
             {inputMode === "machineId" ? (
               <button
                 onClick={handleSwitchToPin}
-                disabled={!(yearInput.length === 4 && seriesInput.length === 3 && unitInput.length === 3)}
+                disabled={!isMachineIdComplete(yearInput, seriesInput, unitInput)}
                 className="text-xs bg-[#0e5f97] text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>Next</span>
@@ -817,7 +833,7 @@ export default function LoginPage() {
               className="absolute inset-0"
               style={{
                 backgroundImage:
-                  "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0iIzBlNWY5NyIgZmlsbC1ydWxlPSJldmVub2RkIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIvPjwvZz48L3N2Zz4=')",
+                  "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnMzLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0iIzBlNWY5NyIgZmlsbC1ydWxlPSJldmVub2RkIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIvPjwvZz48L3N2Zz4=')",
                 backgroundSize: "20px 20px",
               }}
             ></div>
@@ -867,11 +883,98 @@ export default function LoginPage() {
       </div>
     )
 
+    // Render machine ID input display
+    const renderMachineIdDisplay = () => {
+      let displayValue = ""
+      let maxLength = 0
+
+      if (machineIdPart === "year") {
+        displayValue = yearInput
+        maxLength = 4
+      } else if (machineIdPart === "series") {
+        displayValue = seriesInput
+        maxLength = 3
+      } else if (machineIdPart === "unit") {
+        displayValue = unitInput
+        maxLength = 3
+      }
+
+      return (
+        <div className="flex gap-3 justify-center">
+          {[...Array(maxLength)].map((_, i) => {
+            const isFilled = i < displayValue.length
+            return (
+              <div
+                key={i}
+                className={`relative w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold transition-all duration-300 overflow-hidden
+                  ${
+                    isFilled
+                      ? "border-none bg-gradient-to-br from-[#0e5f97] to-[#0c4d7a] text-white shadow-[0_0_10px_rgba(14,95,151,0.4)]"
+                      : "border-2 border-[#0e5f97]/20 bg-white/50 text-transparent"
+                  }`}
+              >
+                {/* Inner glow effect */}
+                {isFilled && <div className="absolute inset-0 bg-[#0e5f97] opacity-20 animate-pulse"></div>}
+
+                {/* Highlight effect */}
+                <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent rounded-t-lg"></div>
+
+                {/* Digit display */}
+                <div className={`relative z-10 ${isFilled ? "text-white text-xl font-bold" : ""}`}>
+                  {isFilled ? displayValue[i] : ""}
+                </div>
+
+                {/* Bottom shadow */}
+                <div className="absolute bottom-0 left-1 right-1 h-0.5 bg-black/5 rounded-full"></div>
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
+    // Handle numpad button press based on current mode
+    const handleNumpadPress = (digit: string) => {
+      if (loading) return
+
+      if (inputMode === "machineId") {
+        if (digit === "C") {
+          handleMachineIdClear()
+        } else if (digit === "⌫") {
+          handleMachineIdBackspace()
+        } else {
+          handleMachineIdInput(digit)
+        }
+      } else {
+        if (digit === "C") {
+          handlePinClear()
+        } else if (digit === "⌫") {
+          handlePinBackspace()
+        } else {
+          handlePinInput(digit)
+        }
+      }
+    }
+
     return (
       <div className="flex flex-col h-full">
         <div className="text-center mb-4">
-          {renderPinDisplay()}
-          <p className="text-xs text-gray-500 italic mt-1">Enter your PIN to access the machine</p>
+          {/* Display based on current input mode */}
+          {inputMode === "machineId" ? (
+            <>
+              {renderMachineIdDisplay()}
+              <p className="text-xs text-gray-500 italic mt-1">
+                {machineIdPart === "year" && "Enter Year (4 digits)"}
+                {machineIdPart === "series" && "Enter Series (3 digits)"}
+                {machineIdPart === "unit" && "Enter Unit (3 digits)"}
+              </p>
+            </>
+          ) : (
+            <>
+              {renderPinDisplay()}
+              <p className="text-xs text-gray-500 italic mt-1">Enter your PIN to access the machine</p>
+            </>
+          )}
         </div>
 
         {/* Numpad */}
@@ -893,32 +996,53 @@ export default function LoginPage() {
           {NUMBER_PAD.map((row, rowIndex) => (
             <React.Fragment key={rowIndex}>
               {row.map((digit, colIndex) => {
-                // Special case: transform the "0" button into a login button when PIN is complete
+                // Special case: transform the "0" button into a login/next button when input is complete
                 const isPinComplete = pin.length === 4
+                const isYearComplete = yearInput.length === 4
+                const isSeriesComplete = seriesInput.length === 3
+                const isUnitComplete = unitInput.length === 3
+
+                const isCurrentInputComplete =
+                  (inputMode === "pin" && isPinComplete) ||
+                  (inputMode === "machineId" && machineIdPart === "year" && isYearComplete) ||
+                  (inputMode === "machineId" && machineIdPart === "series" && isSeriesComplete) ||
+                  (inputMode === "machineId" && machineIdPart === "unit" && isUnitComplete)
+
                 const isZeroButton = digit === "0"
-                const isLoginButton = isPinComplete && isZeroButton
-                const isSpecial = digit === "C" || digit === "⌫" || isLoginButton
+                const isActionButton = isCurrentInputComplete && isZeroButton
+                const isSpecial = digit === "C" || digit === "⌫" || isActionButton
 
                 return (
                   <button
                     key={`${rowIndex}-${colIndex}`}
                     onClick={() => {
-                      if (isLoginButton) {
-                        handleLogin()
-                      } else if (digit === "C") {
-                        handlePinClear()
-                      } else if (digit === "⌫") {
-                        handlePinBackspace()
+                      if (isActionButton) {
+                        if (inputMode === "pin") {
+                          handleLogin()
+                        } else if (inputMode === "machineId") {
+                          // If year is complete, move to series
+                          if (machineIdPart === "year" && isYearComplete) {
+                            updateState({ machineIdPart: "series" })
+                          }
+                          // If series is complete, move to unit
+                          else if (machineIdPart === "series" && isSeriesComplete) {
+                            updateState({ machineIdPart: "unit" })
+                          }
+                          // If unit is complete, switch to PIN mode
+                          else if (machineIdPart === "unit" && isUnitComplete) {
+                            handleSwitchToPin()
+                          }
+                        }
                       } else {
-                        handlePinInput(digit)
+                        handleNumpadPress(digit)
                       }
                     }}
-                    disabled={loading || (isPinComplete && !isLoginButton && !isSpecial)}
+                    disabled={loading || (isCurrentInputComplete && !isActionButton && !isSpecial)}
                     className={`
                     h-14 text-2xl font-medium rounded-lg transition-all duration-300 
                     relative group overflow-hidden w-full
                     ${
-                      isLoginButton
+                      isActionButton
                         ? "bg-gradient-to-br from-[#0e5f97] to-[#0c4d7a] text-white border border-[#0e5f97]/50"
                         : isSpecial
                           ? "bg-gradient-to-br from-white to-gray-50 text-[#0e5f97] border border-[#0e5f97]/20"
@@ -940,7 +1064,7 @@ export default function LoginPage() {
 
                     {/* Button content */}
                     <span className="relative z-10 flex items-center justify-center h-full">
-                      {isLoginButton ? (
+                      {isActionButton ? (
                         <div className="flex items-center justify-center gap-1">
                           {loading ? (
                             <>
@@ -949,21 +1073,32 @@ export default function LoginPage() {
                             </>
                           ) : (
                             <>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-1"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                                <polyline points="10 17 15 12 10 7" />
-                                <line x1="15" y1="12" x2="3" y2="12" />
-                              </svg>
-                              <span className="text-base font-medium">Verify</span>
+                              {inputMode === "pin" ? (
+                                <>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-5 w-5 mr-1"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                                    <polyline points="10 17 15 12 10 7" />
+                                    <line x1="15" y1="12" x2="3" y2="12" />
+                                  </svg>
+                                  <span className="text-base font-medium">Verify</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronRight className="h-5 w-5 mr-1" />
+                                  <span className="text-base font-medium">
+                                    {machineIdPart === "unit" ? "Enter PIN" : "Next"}
+                                  </span>
+                                </>
+                              )}
                             </>
                           )}
                         </div>
@@ -994,8 +1129,8 @@ export default function LoginPage() {
                     {/* Bottom shadow */}
                     <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-black/5 rounded-full"></span>
 
-                    {/* Animated highlight for login button */}
-                    {isLoginButton && (
+                    {/* Animated highlight for action button */}
+                    {isActionButton && (
                       <>
                         <span className="absolute inset-0 bg-white/10 rounded-lg transform scale-0 group-hover:scale-100 transition-transform duration-500 origin-center"></span>
                         <span className="absolute inset-0 bg-white/20 rounded-lg animate-pulse-subtle"></span>
@@ -1015,7 +1150,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0e5f97] pt-6 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
       {/* Dynamic background */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InRnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InRnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvP2c+PC9zdmc+')] opacity-70"></div>
 
       {/* Modals */}
       {showSavedModal && <SavedMachineModal />}
@@ -1062,8 +1197,6 @@ export default function LoginPage() {
 
           {/* Main content grid - following setup/page.tsx layout */}
           <div className="h-[440px] max-h-[440px] flex flex-col justify-between relative ">
-
-
             {/* Two-column layout - similar to setup/page.tsx PIN step */}
             <div className="grid grid-cols-12 gap-4">
               {/* Left column - Machine ID */}
@@ -1079,8 +1212,8 @@ export default function LoginPage() {
                     className="px-4 py-2 text-[#0e5f97] text-md font-semibold bg-white/70 backdrop-blur-sm rounded-xl border border-[#0e5f97]/10 shadow hover:bg-white/90 transition-all hover:shadow-md group"
                   >
                     <span className="flex items-center">
-                    <ArrowLeft className="h-4 w-4 transform transition-transform group-hover:-translate-x-1" />
-                    <span className="ml-1">Back</span>
+                      <ArrowLeft className="h-4 w-4 transform transition-transform group-hover:-translate-x-1" />
+                      <span className="ml-1">Back</span>
                     </span>
                   </Link>
                 </div>
@@ -1177,17 +1310,7 @@ export default function LoginPage() {
         
         @keyframes shine-slow {
           0% { transform: translateX(-100%); }
-          50%, 100% { transform: translateX(100%); }
-        }
-        
-        @keyframes animate-progress {
-          0% { width: 0%; }
-          100% { width: 100%; }
-        }
-
-        @keyframes fade-in-up {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
+          20%, 100% { transform: translateX(100%); }
         }
       `}</style>
     </div>

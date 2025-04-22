@@ -1,0 +1,9 @@
+appId: com.megg.tech
+productName: MEGG
+directories:
+  output: build
+  buildResources: assets
+files:
+  - out/**/*
+  - electron/**/*
+  - package.json

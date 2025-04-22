@@ -17,7 +17,7 @@ interface EggLoadingProps {
   progress?: number
 }
 
-const EggLoading: React.FC<EggLoadingProps> = ({ isLoading, onComplete, context, progress }) => {
+const EggLoading: React.FC<EggLoadingProps> = ({ isLoading, onComplete, progress }) => {
   const [animationProgress, setAnimationProgress] = useState(0)
 
   useEffect(() => {

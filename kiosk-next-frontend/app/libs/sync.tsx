@@ -1,3 +1,5 @@
+// D:\4THYEAR\CAPSTONE\MEGG\kiosk-next-frontend\app\libs\sync.tsx
+
 import { db, storage } from "./firebaseConfig"
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore"
 import { ref, uploadString } from "firebase/storage"
@@ -22,7 +24,7 @@ interface DefectLog {
   synced: boolean
   imageUrl?: string
   defectType?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface ImageRecord {
@@ -31,7 +33,7 @@ interface ImageRecord {
   storage_path?: string
   imageData: string
   uploaded: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // ==========================================
@@ -52,7 +54,7 @@ let isSyncing = false
 const logger = {
   log: (message: string) => console.log(`[Sync] ${message}`),
   warn: (message: string) => console.warn(`[Sync] ${message}`),
-  error: (message: string, error?: any) => console.error(`[Sync] ${message}`, error || ""),
+  error: (message: string, error?: unknown) => console.error(`[Sync] ${message}`, error || ""),
 }
 
 // ==========================================
@@ -68,8 +70,11 @@ function ensureNumericId(id: string | number): number {
 /**
  * Creates a clean object for Firebase by excluding specified properties
  */
-function createCleanObject<T extends Record<string, any>>(source: T, excludeProps: string[] = []): Record<string, any> {
-  const result: Record<string, any> = {}
+function createCleanObject<T extends Record<string, unknown>>(
+  source: T,
+  excludeProps: string[] = [],
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
 
   Object.keys(source).forEach((key) => {
     if (!excludeProps.includes(key)) {

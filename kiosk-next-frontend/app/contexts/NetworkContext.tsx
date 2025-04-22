@@ -7,9 +7,14 @@ import { syncData } from "../libs/sync"
 // ==========================================
 // Types
 // ==========================================
+interface WebSocketMessage {
+  action: string
+  [key: string]: unknown
+}
+
 interface WebSocketContextType {
-  sendMessage: (message: any) => void
-  lastMessage: any | null
+  sendMessage: (message: WebSocketMessage) => void
+  lastMessage: WebSocketMessage | null
   readyState: number
 }
 
@@ -109,7 +114,7 @@ export const NetworkProvider = ({ children }: NetworkProviderProps): React.React
   // ==========================================
   // WebSocket State
   // ==========================================
-  const [lastMessage, setLastMessage] = useState<any | null>(null)
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null)
   const [readyState, setReadyState] = useState<number>(WebSocket.CLOSED)
   const ws = useRef<WebSocket | null>(null)
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -223,7 +228,7 @@ export const NetworkProvider = ({ children }: NetworkProviderProps): React.React
 
     ws.current.onmessage = (event: MessageEvent): void => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data) as WebSocketMessage
         if (data.action === "pong") {
           return
         }
@@ -242,7 +247,7 @@ export const NetworkProvider = ({ children }: NetworkProviderProps): React.React
     }
   }, [startPing, stopPing])
 
-  const sendMessage = useCallback((message: any): void => {
+  const sendMessage = useCallback((message: WebSocketMessage): void => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message))
     } else {

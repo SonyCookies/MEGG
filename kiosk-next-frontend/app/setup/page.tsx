@@ -10,7 +10,6 @@ import {
   Check,
   Copy,
   Shield,
-  QrCode,
   ArrowRight,
   ChevronLeft,
   CheckCircle,

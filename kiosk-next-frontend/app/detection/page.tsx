@@ -22,6 +22,7 @@ import {
   AlertCircle,
   RefreshCw,
   Settings,
+  ZoomIn,
   Scale,
   CircleDot,
   X,
@@ -35,7 +36,7 @@ export default function DetectionPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isCameraOn, setIsCameraOn] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [, setIsFullscreen] = useState(false)
   const [isMirrorMode, setIsMirrorMode] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null)
@@ -148,6 +149,7 @@ export default function DetectionPage() {
     }
   }, [])
 
+  // Replace the toggleCamera function with this updated version that includes Raspberry Pi specific options
   const toggleCamera = async () => {
     if (readyState !== WebSocket.OPEN) {
       setErrorMessage("WebSocket is not connected. Please wait and try again.")
@@ -159,17 +161,56 @@ export default function DetectionPage() {
       setIsCameraOn(false)
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        // Add specific constraints for Raspberry Pi
+        const constraints = {
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { max: 30 },
+            facingMode: "environment",
+          },
+        }
+
+        console.log("Attempting to access camera with constraints:", constraints)
+
+        // Try to access the camera with specific constraints
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().catch((e) => console.error(`Error playing video: ${e}`))
+            videoRef.current?.play().catch((e) => {
+              console.error(`Error playing video: ${e}`)
+              setErrorMessage(`Error playing video: ${e instanceof Error ? e.message : String(e)}`)
+            })
           }
+          setIsCameraOn(true)
+          console.log("Camera stream successfully initialized")
         }
-        setIsCameraOn(true)
       } catch (err) {
         console.error("Error accessing the camera:", err)
-        setErrorMessage(`Error accessing the camera: ${err instanceof Error ? err.message : String(err)}`)
+
+        // Try again with minimal constraints as fallback
+        try {
+          console.log("Trying fallback with minimal constraints")
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = fallbackStream
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play().catch((e) => console.error(`Error playing video: ${e}`))
+            }
+            setIsCameraOn(true)
+            console.log("Camera initialized with fallback method")
+          }
+        } catch (fallbackErr) {
+          console.error("Fallback camera access also failed:", fallbackErr)
+          setErrorMessage(`Error accessing the camera: ${err instanceof Error ? err.message : String(err)}. 
+            Make sure the camera is properly connected and permissions are granted.`)
+        }
       }
     }
   }
@@ -241,23 +282,6 @@ export default function DetectionPage() {
     }, 1500)
   }
 
-  // Helper function to get color class based on prediction type
-  const getColorClass = (type: string | null) => {
-    if (!type) return "bg-gray-100/80"
-
-    switch (type.toLowerCase()) {
-      case "good":
-        return "bg-green-100/90 border-green-200"
-      case "dirty":
-        return "bg-yellow-100/90 border-yellow-200"
-      case "broken":
-        return "bg-red-100/90 border-red-200"
-      case "cracked":
-        return "bg-orange-100/90 border-orange-200"
-      default:
-        return "bg-blue-100/90 border-blue-200"
-    }
-  }
 
   const getTextColorClass = (type: string | null) => {
     if (!type) return "text-gray-700"
@@ -434,7 +458,7 @@ export default function DetectionPage() {
                   </div>
 
                   {/* Tab navigation */}
-                  <div className="flex border-b border-gray-200 mb-4 justify-around relative">
+                  <div className="flex border-b border-gray-200 mb-4 relative">
                     <button
                       className={`px-4 py-2 font-medium text-sm relative transition-all duration-300 ${
                         activeTab === "quality" ? "text-[#0e5f97]" : "text-gray-500 hover:text-gray-700"
@@ -876,7 +900,7 @@ export default function DetectionPage() {
               <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-center z-20">
                 <div className="flex items-center gap-3">
                   <Link
-                    href="/home"
+                    href="/"
                     className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg text-[#0e5f97] flex items-center justify-center transform hover:scale-105 active:scale-95 border border-white/50"
                   >
                     <ArrowLeft className="w-6 h-6" />
@@ -980,6 +1004,9 @@ export default function DetectionPage() {
                         className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group"
                       >
                         <Maximize2 className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" />
+                      </button>
+                      <button className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group">
+                        <ZoomIn className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" />
                       </button>
                       <button className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group">
                         <Settings className="w-7 h-7 group-hover:rotate-90 transition-transform duration-500" />
