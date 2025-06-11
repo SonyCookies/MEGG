@@ -4,10 +4,11 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { Settings, LogIn, Plug, Globe } from "lucide-react"
+import { Settings, LogIn, Plug, Globe, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import EggLoading from "./components/egg-loading"
 import { useInternetConnection, useWebSocket } from "./contexts/NetworkContext"
+import WiFiButton from "./components/wifi-button"
 
 // Define proper types for the loading context
 interface LoadingContext {
@@ -46,20 +47,17 @@ export default function Home() {
 
   const handleButtonClick = (route: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
-    // console.log(`🖱️ Button clicked: Navigating to ${route}`)
     setIsLoading(true)
     setNavigateTo(route)
 
     // Set loading context based on destination
     if (route === "/login") {
-      // console.log("🔑 Setting context for login navigation")
       setLoadingContext({
         title: "Accessing Login",
         icon: "login",
         destination: route,
       })
     } else if (route === "/setup") {
-      // console.log("⚙️ Setting context for setup navigation")
       setLoadingContext({
         title: "Preparing Setup",
         icon: "setup",
@@ -69,27 +67,70 @@ export default function Home() {
   }
 
   const handleLoadingComplete = () => {
-    // console.log("✅ Loading complete callback triggered")
     setIsLoading(false)
     if (navigateTo) {
-      // console.log(`🧭 Navigating to: ${navigateTo}`)
-      // Use router.push instead of directly setting window.location
-      // for better Next.js integration
       router.push(navigateTo)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0e5f97] pt-4 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
+    <div className="min-h-screen bg-[#0e5f97] pt-6 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
+      {/* Network Disconnection Alert */}
+      {(!isOnline || !isWebSocketConnected) && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md animate-fade-in-down">
+          <div className="backdrop-blur-sm bg-white/90 rounded-xl shadow-2xl overflow-hidden border border-red-400/50 relative">
+            {/* Holographic overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-red-300/10 to-transparent opacity-50 mix-blend-overlay"></div>
+
+            {/* Animated edge glow */}
+            <div className="absolute inset-0 rounded-xl animate-border-glow-red"></div>
+
+            <div className="px-4 py-3 flex items-center gap-3 relative z-10">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500 tracking-wide">
+                  Connection Lost
+                </p>
+                <p className="text-sm text-gray-600/90">
+                  {!isOnline && !isWebSocketConnected
+                    ? "Internet and WebSocket connections are unavailable"
+                    : !isOnline
+                      ? "Internet connection is unavailable"
+                      : "WebSocket connection is unavailable"}
+                </p>
+              </div>
+            </div>
+
+            {/* Decorative corner accents */}
+            <div className="absolute top-0 left-0 w-8 h-8">
+              <div className="absolute top-0 left-0 w-full h-full border-t-2 border-l-2 border-red-400/30 rounded-tl-xl"></div>
+            </div>
+            <div className="absolute top-0 right-0 w-8 h-8">
+              <div className="absolute top-0 right-0 w-full h-full border-t-2 border-r-2 border-red-400/30 rounded-tr-xl"></div>
+            </div>
+            <div className="absolute bottom-0 left-0 w-8 h-8">
+              <div className="absolute bottom-0 left-0 w-full h-full border-b-2 border-l-2 border-red-400/30 rounded-bl-xl"></div>
+            </div>
+            <div className="absolute bottom-0 right-0 w-8 h-8">
+              <div className="absolute bottom-0 right-0 w-full h-full border-b-2 border-r-2 border-red-400/30 rounded-br-xl"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading overlay */}
       <EggLoading isLoading={isLoading} onComplete={handleLoadingComplete} context={loadingContext} />
 
-      {/* Dynamic background with floating particles */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSRyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
+      {/* Dynamic background */}
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InRnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
 
       {/* Main card */}
       <div
-        className={`max-w-3xl w-full transition-all duration-1000 ${isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
+        className={`max-w-3xl w-full transition-all duration-1000 ${
+          isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+        }`}
       >
         {/* Card with glass morphism effect */}
         <div className="relative backdrop-blur-sm bg-white/90 rounded-2xl shadow-2xl overflow-hidden border border-white/50 h-[440px]">
@@ -198,13 +239,17 @@ export default function Home() {
 
               {/* Setup button with enhanced effects */}
               <a
-                href="/setup"
-                className="block w-full group"
-                onClick={handleButtonClick("/setup")}
-                onMouseEnter={() => setHoverButton("setup")}
+                href={isOnline && isWebSocketConnected ? "/setup" : "#"}
+                className={`block w-full ${!isOnline || !isWebSocketConnected ? "cursor-not-allowed" : "group"}`}
+                onClick={isOnline && isWebSocketConnected ? handleButtonClick("/setup") : (e) => e.preventDefault()}
+                onMouseEnter={() => isOnline && isWebSocketConnected && setHoverButton("setup")}
                 onMouseLeave={() => setHoverButton(null)}
               >
-                <div className="flex items-center gap-3 px-5 py-4 bg-white rounded-xl shadow-md border border-[#0e5f97]/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
+                <div
+                  className={`flex items-center gap-3 px-5 py-4 bg-white rounded-xl shadow-md border border-[#0e5f97]/10 ${
+                    isOnline && isWebSocketConnected ? "group-hover:shadow-lg group-hover:scale-[1.02]" : "opacity-70"
+                  } transition-all duration-300 w-full relative overflow-hidden`}
+                >
                   {/* Background animation on hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0e5f97]/0 via-[#0e5f97]/5 to-[#0e5f97]/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
 
@@ -223,7 +268,9 @@ export default function Home() {
 
                   {/* Animated arrow */}
                   <div
-                    className={`text-[#0e5f97]/70 transform transition-transform duration-300 ${hoverButton === "setup" ? "translate-x-1" : ""}`}
+                    className={`text-[#0e5f97]/70 transform transition-transform duration-300 ${
+                      hoverButton === "setup" ? "translate-x-1" : ""
+                    }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path
@@ -238,13 +285,17 @@ export default function Home() {
 
               {/* Login button with enhanced effects */}
               <a
-                href="/login"
-                className="block w-full group"
-                onClick={handleButtonClick("/login")}
-                onMouseEnter={() => setHoverButton("login")}
+                href={isOnline && isWebSocketConnected ? "/login" : "#"}
+                className={`block w-full ${!isOnline || !isWebSocketConnected ? "cursor-not-allowed" : "group"}`}
+                onClick={isOnline && isWebSocketConnected ? handleButtonClick("/login") : (e) => e.preventDefault()}
+                onMouseEnter={() => isOnline && isWebSocketConnected && setHoverButton("login")}
                 onMouseLeave={() => setHoverButton(null)}
               >
-                <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-xl shadow-md border border-white/10 group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-300 w-full relative overflow-hidden">
+                <div
+                  className={`flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-[#0e5f97] to-[#0c4d7a] rounded-xl shadow-md border border-white/10 ${
+                    isOnline && isWebSocketConnected ? "group-hover:shadow-lg group-hover:scale-[1.02]" : "opacity-70"
+                  } transition-all duration-300 w-full relative overflow-hidden`}
+                >
                   {/* Enhanced background animation on hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
 
@@ -263,7 +314,9 @@ export default function Home() {
 
                   {/* Animated arrow */}
                   <div
-                    className={`text-white/70 transform transition-transform duration-300 ${hoverButton === "login" ? "translate-x-1" : ""}`}
+                    className={`text-white/70 transform transition-transform duration-300 ${
+                      hoverButton === "login" ? "translate-x-1" : ""
+                    }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path
@@ -278,30 +331,42 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Connectivity indicators */}
-          <div className="absolute bottom-4 right-4 flex items-center gap-3">
-            {/* WebSocket indicator */}
-            <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-full shadow-sm">
-              <Plug className="h-4 w-4 text-gray-600" />
-              <div className={`w-2.5 h-2.5 rounded-full ${isWebSocketConnected ? "bg-green-500" : "bg-red-500"}`}>
-                <div
-                  className={`w-full h-full rounded-full ${isWebSocketConnected ? "animate-ping bg-green-400/50" : "bg-red-400/50"}`}
-                  style={{ animationDuration: "2s" }}
-                ></div>
-              </div>
-              <span className="text-xs text-gray-600 ml-1">{isWebSocketConnected ? "Connected" : "Disconnected"}</span>
-            </div>
+          {/* Connectivity indicators - Better positioned */}
+          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+            {/* WiFi Management Button - Left side */}
+            <WiFiButton />
 
-            {/* Internet indicator */}
-            <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-full shadow-sm">
-              <Globe className="h-4 w-4 text-gray-600" />
-              <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}>
-                <div
-                  className={`w-full h-full rounded-full ${isOnline ? "animate-ping bg-green-400/50" : "bg-red-400/50"}`}
-                  style={{ animationDuration: "2s" }}
-                ></div>
+            {/* Other indicators - Right side */}
+            <div className="flex items-center gap-2">
+              {/* WebSocket indicator */}
+              <div className="flex items-center gap-1.5 bg-white/80 px-3 py-2 rounded-lg shadow-sm border border-gray-200">
+                <Plug className="h-4 w-4 text-gray-600" />
+                <div className={`w-2.5 h-2.5 rounded-full ${isWebSocketConnected ? "bg-green-500" : "bg-red-500"}`}>
+                  <div
+                    className={`w-full h-full rounded-full ${
+                      isWebSocketConnected ? "animate-ping bg-green-400/50" : "bg-red-400/50"
+                    }`}
+                    style={{ animationDuration: "2s" }}
+                  ></div>
+                </div>
+                <span className="text-xs text-gray-600 ml-1 font-medium">
+                  {isWebSocketConnected ? "Connected" : "Disconnected"}
+                </span>
               </div>
-              <span className="text-xs text-gray-600 ml-1">{isOnline ? "Online" : "Offline"}</span>
+
+              {/* Internet indicator */}
+              <div className="flex items-center gap-1.5 bg-white/80 px-3 py-2 rounded-lg shadow-sm border border-gray-200">
+                <Globe className="h-4 w-4 text-gray-600" />
+                <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}>
+                  <div
+                    className={`w-full h-full rounded-full ${
+                      isOnline ? "animate-ping bg-green-400/50" : "bg-red-400/50"
+                    }`}
+                    style={{ animationDuration: "2s" }}
+                  ></div>
+                </div>
+                <span className="text-xs text-gray-600 ml-1 font-medium">{isOnline ? "Online" : "Offline"}</span>
+              </div>
             </div>
           </div>
 
@@ -328,79 +393,157 @@ export default function Home() {
       {/* Add keyframes for animations */}
       <style jsx global>{`
         @keyframes ping-slow {
-          0% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.2); opacity: 0.4; }
-          100% { transform: scale(1); opacity: 0.8; }
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 0.4;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
         }
-        
+
         @keyframes shine {
-          0% { transform: translateX(-100%); }
-          20%, 100% { transform: translateX(100%); }
+          0% {
+            transform: translateX(-100%);
+          }
+          20%,
+          100% {
+            transform: translateX(100%);
+          }
         }
-        
+
         @keyframes text-shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
         }
-        
+
         @keyframes border-glow {
-          0%, 100% { 
+          0%,
+          100% {
             box-shadow: 0 0 5px rgba(14, 95, 151, 0.3),
-                        0 0 10px rgba(14, 95, 151, 0.2),
-                        0 0 15px rgba(14, 95, 151, 0.1);
+              0 0 10px rgba(14, 95, 151, 0.2), 0 0 15px rgba(14, 95, 151, 0.1);
           }
-          50% { 
+          50% {
             box-shadow: 0 0 10px rgba(14, 95, 151, 0.5),
-                        0 0 20px rgba(14, 95, 151, 0.3),
-                        0 0 30px rgba(14, 95, 151, 0.2);
+              0 0 20px rgba(14, 95, 151, 0.3), 0 0 30px rgba(14, 95, 151, 0.2);
           }
         }
         
+        @keyframes border-glow-red {
+          0%,
+          100% {
+            box-shadow: 0 0 5px rgba(220, 38, 38, 0.3),
+              0 0 10px rgba(220, 38, 38, 0.2), 0 0 15px rgba(220, 38, 38, 0.1);
+          }
+          50% {
+            box-shadow: 0 0 10px rgba(220, 38, 38, 0.5),
+              0 0 20px rgba(220, 38, 38, 0.3), 0 0 30px rgba(220, 38, 38, 0.2);
+          }
+        }
+
         @keyframes float {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(10px, -10px); }
+          0%,
+          100% {
+            transform: translate(0, 0);
+          }
+          50% {
+            transform: translate(10px, -10px);
+          }
         }
-        
+
         @keyframes float-slow {
-          0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50% { transform: translate(5px, -5px) rotate(10deg); }
+          0%,
+          100% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          50% {
+            transform: translate(5px, -5px) rotate(10deg);
+          }
         }
-        
+
         @keyframes float-slow-reverse {
-          0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50% { transform: translate(-5px, -5px) rotate(-10deg); }
+          0%,
+          100% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          50% {
+            transform: translate(-5px, -5px) rotate(-10deg);
+          }
         }
-        
+
         @keyframes pulse-scale {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.5); opacity: 0.6; }
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.5);
+            opacity: 0.6;
+          }
         }
-        
+
         @keyframes pulse-grow {
-          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
-          50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.1; }
+          0%,
+          100% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 0.3;
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.1);
+            opacity: 0.1;
+          }
         }
-        
+
         @keyframes travel-y {
-          0%, 100% { top: 10%; }
-          50% { top: 90%; }
+          0%,
+          100% {
+            top: 10%;
+          }
+          50% {
+            top: 90%;
+          }
         }
-        
+
         .animate-text-shimmer {
           background-size: 200% auto;
           animation: text-shimmer 5s infinite linear;
         }
-        
+
         .animate-shine {
           animation: shine 2s infinite;
         }
-        
+
         .animate-float {
           animation: float 10s infinite ease-in-out;
         }
-        
+
         .animate-pulse-grow {
           animation: pulse-grow 3s infinite ease-in-out;
+        }
+
+        @keyframes fade-in-down {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -20px);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+        }
+
+        .animate-fade-in-down {
+          animation: fade-in-down 0.5s ease-out forwards;
         }
       `}</style>
     </div>

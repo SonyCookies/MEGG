@@ -1,4 +1,5 @@
 import { NetworkProvider } from "./contexts/NetworkContext"
+import { CameraProvider } from "./contexts/CameraContext"
 import { Poppins } from "next/font/google"
 import "./globals.css"
 import type { ReactNode } from "react"
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body className={poppins.className}>
-        <NetworkProvider>{children}</NetworkProvider>
+        <NetworkProvider>
+          <CameraProvider>{children}</CameraProvider>
+        </NetworkProvider>
       </body>
     </html>
   )

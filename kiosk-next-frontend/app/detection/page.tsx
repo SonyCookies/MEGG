@@ -20,15 +20,35 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  RefreshCw,
-  Settings,
-  ZoomIn,
   Scale,
   CircleDot,
   X,
+  Loader,
+  MonitorSmartphone,
 } from "lucide-react"
 import { useWebSocket, useInternetConnection } from "../contexts/NetworkContext"
+import { useCamera } from "../contexts/CameraContext"
+import { useDefectDetection } from "../contexts/DefectDetectionContext"
+import { captureImageFromVideo } from "./image-capture"
 import type { ReactNode } from "react"
+
+// Import the camera overlay components
+import { CameraLoadingOverlay } from "./components/camera-loading-overlay"
+import { CameraErrorOverlay } from "./components/camera-error-overlay"
+import ElectronCameraIntegration from "./components/electron-camera-integration"
+import CameraStartupAnimation from "./components/camera-startup-animation"
+
+// Types
+interface DetectionResult {
+  prediction: string | null
+  confidence: number | null
+}
+
+interface StatusIndicatorProps {
+  isActive: boolean
+  activeIcon: ReactNode
+  inactiveIcon: ReactNode
+}
 
 export default function DetectionPage() {
   const { readyState } = useWebSocket()
@@ -45,6 +65,39 @@ export default function DetectionPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const [activeTab, setActiveTab] = useState<"quality" | "size">("quality")
+  const [isCameraLoading, setIsCameraLoading] = useState(false)
+  const [showErrorOverlay, setShowErrorOverlay] = useState(false)
+  const [isElectronMode, setIsElectronMode] = useState(false)
+  const [showCameraStartupAnimation, setShowCameraStartupAnimation] = useState(false)
+
+  // Get camera context
+  const camera = useCamera()
+
+  // Get defect detection context
+  const defectDetection = useDefectDetection()
+
+  // Check if we're running in Electron
+  useEffect(() => {
+    const checkElectron = () => {
+      const isElectron = window && window.electronAPI !== undefined
+      console.log("🖥️ Running in Electron:", isElectron)
+      setIsElectronMode(isElectron)
+    }
+
+    checkElectron()
+  }, [])
+
+  // Connect to the defect detection service when the component mounts
+  useEffect(() => {
+    defectDetection.connect().catch((error) => {
+      console.error("❌ Failed to connect to defect detection service:", error)
+      setErrorMessage(`Failed to connect to defect detection service: ${error.message}`)
+    })
+
+    return () => {
+      defectDetection.disconnect()
+    }
+  }, [defectDetection])
 
   // Enhanced mock batch info with both quality and size data
   const currentBatch = {
@@ -101,68 +154,126 @@ export default function DetectionPage() {
     return () => clearTimeout(timer)
   }, [isLoaded, showBatchInfo])
 
-  // Mock detection result
+  // Perform defect detection at regular intervals when camera is on
   useEffect(() => {
-    if (isCameraOn) {
-      const timer = setInterval(() => {
-        // Simulate processing
-        setIsProcessing(true)
-        setProcessingProgress(0)
+    if (isCameraOn && !isProcessing && !defectDetection.isProcessing) {
+      const detectionInterval = setInterval(() => {
+        triggerDefectDetection()
+      }, 10000) // Run detection every 10 seconds
 
-        const progressInterval = setInterval(() => {
-          setProcessingProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(progressInterval)
-              return 100
-            }
-            return prev + 5
-          })
-        }, 50)
-
-        // Simulate detection completion
-        setTimeout(() => {
-          const defectTypes = ["good", "dirty", "broken", "cracked"]
-          const randomType = defectTypes[Math.floor(Math.random() * defectTypes.length)]
-          const randomConfidence = Math.random() * 30 + 70 // 70-100%
-
-          setDetectionResult({
-            prediction: randomType,
-            confidence: randomConfidence,
-          })
-
-          setIsProcessing(false)
-          clearInterval(progressInterval)
-          setProcessingProgress(100)
-        }, 1500)
-      }, 10000)
-
-      return () => clearInterval(timer)
+      return () => clearInterval(detectionInterval)
     }
-  }, [isCameraOn])
+  }, [isCameraOn, isProcessing, defectDetection.isProcessing])
+
+  // Update local state when defect detection state changes
+  useEffect(() => {
+    setIsProcessing(defectDetection.isProcessing)
+
+    if (defectDetection.lastResult) {
+      setDetectionResult(defectDetection.lastResult)
+    }
+  }, [defectDetection.isProcessing, defectDetection.lastResult])
 
   const stopVideoStream = useCallback(() => {
+    console.log("🎥 Stopping video stream")
+
+    if (isElectronMode) {
+      // In Electron mode, use the camera context
+      camera.stopCamera()
+      setIsCameraOn(false)
+      console.log("✅ Electron camera stopped successfully")
+      return
+    }
+
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream
       const tracks = stream.getTracks()
-      tracks.forEach((track: MediaStreamTrack) => track.stop())
+      console.log(`🎥 Stopping ${tracks.length} media tracks`)
+      tracks.forEach((track: MediaStreamTrack) => {
+        console.log(`🎥 Stopping track: ${track.kind} - ${track.label}`)
+        track.stop()
+      })
       videoRef.current.srcObject = null
+      console.log("✅ Video stream stopped successfully")
+    } else {
+      console.log("ℹ️ No video stream to stop")
     }
+  }, [isElectronMode, camera])
+
+  // Handle camera ready from Electron integration
+  const handleElectronCameraReady = useCallback(() => {
+    console.log("🎥 Electron camera is ready")
+    setIsCameraOn(true)
+    setIsCameraLoading(false)
+    setShowCameraStartupAnimation(false)
+    setShowErrorOverlay(false)
   }, [])
 
-  // Replace the toggleCamera function with this updated version that includes Raspberry Pi specific options
+  // Handle camera error from Electron integration
+  const handleElectronCameraError = useCallback((error: string) => {
+    console.error("❌ Electron camera error:", error)
+    setErrorMessage(error)
+    setIsCameraLoading(false)
+    setShowCameraStartupAnimation(false)
+    setShowErrorOverlay(true)
+  }, [])
+
+  // Toggle camera function that handles both Electron and browser modes
   const toggleCamera = async () => {
+    console.log("🎥 toggleCamera called - Starting camera initialization process")
+
     if (readyState !== WebSocket.OPEN) {
+      console.error("❌ WebSocket not connected - Camera initialization aborted")
       setErrorMessage("WebSocket is not connected. Please wait and try again.")
       return
     }
 
     if (isCameraOn) {
+      console.log("🎥 Camera is already on - Stopping video stream")
       stopVideoStream()
       setIsCameraOn(false)
+      console.log("✅ Camera turned off successfully")
     } else {
       try {
-        // Add specific constraints for Raspberry Pi
+        console.log("🎥 Starting camera initialization sequence")
+        setIsCameraLoading(true)
+        setErrorMessage("") // Clear any previous errors
+        setShowErrorOverlay(false) // Hide error overlay if it was showing
+
+        // Show the egg loading animation
+        setShowCameraStartupAnimation(true)
+
+        // If in Electron mode, use the camera context
+        if (isElectronMode) {
+          console.log("🎥 Using Electron camera API")
+          await camera.startCamera()
+          // The ElectronCameraIntegration component will handle the rest
+          return
+        }
+
+        // Rest of the existing camera initialization code...
+        console.log("🔍 Checking for camera permissions and available devices...")
+
+        // First check if we have permissions
+        try {
+          console.log("📋 Enumerating media devices")
+          const devices = await navigator.mediaDevices.enumerateDevices()
+          const cameras = devices.filter((device) => device.kind === "videoinput")
+          console.log("📋 Available cameras:", cameras)
+          console.log(`📋 Found ${cameras.length} camera devices`)
+
+          if (cameras.length === 0) {
+            console.error("❌ No camera devices found")
+            throw new Error("No camera devices found")
+          }
+        } catch (permErr) {
+          console.error("❌ Error checking camera permissions:", permErr)
+          console.log("⚠️ Will attempt to access camera anyway")
+        }
+
+        // Try with specific constraints for Raspberry Pi
         const constraints = {
+          audio: false,
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 },
@@ -171,48 +282,162 @@ export default function DetectionPage() {
           },
         }
 
-        console.log("Attempting to access camera with constraints:", constraints)
+        console.log("🎥 Attempting to access camera with constraints:", JSON.stringify(constraints, null, 2))
 
-        // Try to access the camera with specific constraints
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().catch((e) => {
-              console.error(`Error playing video: ${e}`)
-              setErrorMessage(`Error playing video: ${e instanceof Error ? e.message : String(e)}`)
-            })
-          }
-          setIsCameraOn(true)
-          console.log("Camera stream successfully initialized")
-        }
-      } catch (err) {
-        console.error("Error accessing the camera:", err)
-
-        // Try again with minimal constraints as fallback
         try {
-          console.log("Trying fallback with minimal constraints")
-          const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          })
+          console.log("🎥 Calling getUserMedia with constraints")
+          const stream = await navigator.mediaDevices.getUserMedia(constraints)
+          console.log("✅ Camera stream obtained successfully:", stream)
+          console.log(`📊 Stream settings: ${stream.getVideoTracks().length} video tracks`)
+
+          if (stream.getVideoTracks().length > 0) {
+            const videoTrack = stream.getVideoTracks()[0]
+            console.log(`📊 Active video track: ${videoTrack.label}`)
+            console.log(`📊 Track settings:`, videoTrack.getSettings())
+          }
 
           if (videoRef.current) {
-            videoRef.current.srcObject = fallbackStream
+            console.log("🎥 Setting video source object to stream")
+            videoRef.current.srcObject = stream
+
             videoRef.current.onloadedmetadata = () => {
-              videoRef.current?.play().catch((e) => console.error(`Error playing video: ${e}`))
+              console.log("✅ Video metadata loaded, attempting to play")
+              videoRef.current?.play().catch((e) => {
+                console.error(`❌ Error playing video:`, e)
+                setErrorMessage(`Error playing video: ${e instanceof Error ? e.message : String(e)}`)
+                setIsCameraLoading(false)
+                setShowCameraStartupAnimation(false)
+                setShowErrorOverlay(true)
+              })
+              setIsCameraOn(true)
+              setIsCameraLoading(false)
+              setShowCameraStartupAnimation(false)
+              console.log("🎉 Camera stream successfully initialized and playing")
             }
-            setIsCameraOn(true)
-            console.log("Camera initialized with fallback method")
+
+            videoRef.current.onerror = (e) => {
+              console.error("❌ Video element error:", e)
+              setErrorMessage(`Video element error: ${e instanceof Error ? e.message : "Unknown error"}`)
+              setIsCameraLoading(false)
+              setShowCameraStartupAnimation(false)
+              setShowErrorOverlay(true)
+            }
+          } else {
+            console.error("❌ Video ref is null - cannot attach stream")
+            setErrorMessage("Video element not found")
+            setIsCameraLoading(false)
+            setShowCameraStartupAnimation(false)
+            setShowErrorOverlay(true)
           }
-        } catch (fallbackErr) {
-          console.error("Fallback camera access also failed:", fallbackErr)
-          setErrorMessage(`Error accessing the camera: ${err instanceof Error ? err.message : String(err)}. 
-            Make sure the camera is properly connected and permissions are granted.`)
+        } catch (err) {
+          console.error("❌ Error accessing the camera with specific constraints:", err)
+          console.log("⚠️ Attempting fallback camera initialization")
+          tryFallbackCamera(err)
         }
+      } catch (err) {
+        console.error("❌ Error in camera initialization:", err)
+        setIsCameraLoading(false)
+        setShowCameraStartupAnimation(false)
+        setErrorMessage(`Camera initialization error: ${err instanceof Error ? err.message : String(err)}`)
+        setShowErrorOverlay(true)
       }
     }
+  }
+
+  // Update the tryFallbackCamera function with more detailed logging
+  const tryFallbackCamera = async (originalError: unknown) => {
+    try {
+      console.log("🔄 Trying fallback camera initialization with minimal constraints")
+      setIsCameraLoading(true)
+
+      // Try with absolute minimal constraints
+      console.log("🎥 Using minimal video constraints: { video: true, audio: false }")
+      const fallbackStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      })
+
+      console.log("✅ Fallback camera stream obtained successfully:", fallbackStream)
+      console.log(`📊 Fallback stream settings: ${fallbackStream.getVideoTracks().length} video tracks`)
+
+      if (fallbackStream.getVideoTracks().length > 0) {
+        const videoTrack = fallbackStream.getVideoTracks()[0]
+        console.log(`📊 Active fallback video track: ${videoTrack.label}`)
+        console.log(`📊 Fallback track settings:`, videoTrack.getSettings())
+      }
+
+      if (videoRef.current) {
+        console.log("🎥 Setting video source with fallback stream")
+        videoRef.current.srcObject = fallbackStream
+
+        videoRef.current.onloadedmetadata = () => {
+          console.log("✅ Fallback video metadata loaded, attempting to play")
+          videoRef.current?.play().catch((e) => {
+            console.error(`❌ Error playing fallback video:`, e)
+            setIsCameraLoading(false)
+            setShowCameraStartupAnimation(false)
+            setErrorMessage(`Error playing fallback video: ${e instanceof Error ? e.message : String(e)}`)
+            setShowErrorOverlay(true)
+          })
+          setIsCameraOn(true)
+          setIsCameraLoading(false)
+          setShowCameraStartupAnimation(false)
+          console.log("🎉 Camera initialized successfully with fallback method")
+        }
+
+        videoRef.current.onerror = (e) => {
+          console.error("❌ Fallback video element error:", e)
+          setIsCameraLoading(false)
+          setShowCameraStartupAnimation(false)
+          setShowErrorOverlay(true)
+        }
+      } else {
+        console.error("❌ Video ref is null in fallback - cannot attach stream")
+        setIsCameraLoading(false)
+        setShowCameraStartupAnimation(false)
+        setErrorMessage("Video element not found in fallback")
+        setShowErrorOverlay(true)
+      }
+    } catch (fallbackErr) {
+      console.error("❌ Fallback camera access also failed:", fallbackErr)
+      console.log("❌ Both primary and fallback camera initialization failed")
+      setIsCameraLoading(false)
+      setShowCameraStartupAnimation(false)
+
+      // More detailed error message
+      let errorMsg = "Camera access failed. "
+
+      if (fallbackErr instanceof DOMException) {
+        if (fallbackErr.name === "NotAllowedError" || fallbackErr.name === "PermissionDeniedError") {
+          console.error("❌ Camera permission denied by user or system")
+          errorMsg += "Camera permission was denied. Please allow camera access in your browser settings."
+        } else if (fallbackErr.name === "NotFoundError") {
+          console.error("❌ No camera device found on this system")
+          errorMsg += "No camera was found on your device."
+        } else if (fallbackErr.name === "NotReadableError" || fallbackErr.name === "AbortError") {
+          console.error("❌ Camera is in use by another application or not accessible")
+          errorMsg += "Camera is already in use by another application or not accessible."
+        } else {
+          console.error(`❌ DOMException: ${fallbackErr.name} - ${fallbackErr.message}`)
+          errorMsg += fallbackErr.message
+        }
+      } else {
+        console.error("❌ Original error:", originalError)
+        errorMsg += `${originalError instanceof Error ? originalError.message : String(originalError)}`
+      }
+
+      errorMsg += " Make sure the camera is properly connected and permissions are granted."
+      console.error(`❌ Final error message: ${errorMsg}`)
+      setErrorMessage(errorMsg)
+      setShowErrorOverlay(true)
+    }
+  }
+
+  // Add a retry handler for the error overlay with logging
+  const handleRetryCamera = () => {
+    console.log("🔄 Retry camera initialization requested by user")
+    setShowErrorOverlay(false)
+    toggleCamera()
   }
 
   const toggleFullscreen = () => {
@@ -248,10 +473,11 @@ export default function DetectionPage() {
     setShowBatchInfo(!showBatchInfo)
   }
 
-  const triggerManualDetection = () => {
-    if (!isCameraOn) return
+  // New function to trigger defect detection
+  const triggerDefectDetection = async () => {
+    if (!isCameraOn || isProcessing || defectDetection.isProcessing) return
 
-    // Simulate processing
+    // Start processing animation
     setIsProcessing(true)
     setProcessingProgress(0)
 
@@ -265,24 +491,56 @@ export default function DetectionPage() {
       })
     }, 50)
 
-    // Simulate detection completion
-    setTimeout(() => {
-      const defectTypes = ["good", "dirty", "broken", "cracked"]
-      const randomType = defectTypes[Math.floor(Math.random() * defectTypes.length)]
-      const randomConfidence = Math.random() * 30 + 70 // 70-100%
+    try {
+      console.log("📸 Starting defect detection process")
 
-      setDetectionResult({
-        prediction: randomType,
-        confidence: randomConfidence,
-      })
+      // Capture image from video element
+      if (isElectronMode) {
+        // In Electron mode, use the camera context to capture a frame
+        console.log("📸 Capturing frame using Electron API")
+        const imageData = await camera.captureFrame()
 
-      setIsProcessing(false)
+        if (imageData) {
+          // Send the image to the defect detection service
+          const result = await defectDetection.detectDefect(imageData)
+
+          if (result) {
+            setDetectionResult(result)
+          }
+        } else {
+          throw new Error("Failed to capture frame from Electron camera")
+        }
+      } else {
+        // In browser mode, capture image from video element
+        if (!videoRef.current) {
+          throw new Error("Video element not available")
+        }
+
+        console.log("📸 Capturing image from video element")
+        const imageData = await captureImageFromVideo(videoRef.current)
+        console.log("📸 Image captured successfully")
+
+        // Send the image to the defect detection service
+        const result = await defectDetection.detectDefect(imageData)
+
+        if (result) {
+          setDetectionResult(result)
+        }
+      }
+
       clearInterval(progressInterval)
       setProcessingProgress(100)
-    }, 1500)
+    } catch (err) {
+      console.error("❌ Error during defect detection:", err)
+      setErrorMessage(`Defect detection error: ${err instanceof Error ? err.message : String(err)}`)
+      clearInterval(progressInterval)
+      setProcessingProgress(0)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-
+  // Helper function to get color class based on prediction type
   const getTextColorClass = (type: string | null) => {
     if (!type) return "text-gray-700"
 
@@ -390,8 +648,41 @@ export default function DetectionPage() {
 
   return (
     <div className="min-h-screen bg-[#0e5f97] pt-4 px-4 pb-4 flex flex-col items-center relative overflow-hidden">
+      {/* Electron Camera Integration (non-visual component) */}
+      {isElectronMode && (
+        <ElectronCameraIntegration
+          onCameraReady={handleElectronCameraReady}
+          onCameraError={handleElectronCameraError}
+        />
+      )}
+
+      {/* Camera startup animation */}
+      {showCameraStartupAnimation && (
+        <CameraStartupAnimation
+          isLoading={showCameraStartupAnimation}
+          onComplete={() => setShowCameraStartupAnimation(false)}
+        />
+      )}
+
+      {isCameraLoading && !showCameraStartupAnimation && <CameraLoadingOverlay />}
+      {showErrorOverlay && <CameraErrorOverlay error={errorMessage} onRetry={handleRetryCamera} />}
+
+      {/* Environment indicator for debugging */}
+      {isElectronMode && (
+        <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1 z-50">
+          <MonitorSmartphone size={14} />
+          <span>Electron Mode</span>
+        </div>
+      )}
+
+      {/* WebSocket connection status */}
+      <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1 z-50">
+        <div className={`w-2 h-2 rounded-full ${defectDetection.isConnected ? "bg-green-500" : "bg-red-500"}`}></div>
+        <span>Detection Service: {defectDetection.isConnected ? "Connected" : "Disconnected"}</span>
+      </div>
+
       {/* Dynamic background with floating particles */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9InN2ZyIgdm1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0wIDMwaDMwdjMwSDB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwSDB2MzBoMzB6IiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIuNSIvPjxwYXRoIGQ9Ik0zMCAwaDMwdjMwSDMweiIgc3Ryb2tlPSNyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iLjUiLz48L2c+PC9zdmc+')] opacity-70"></div>
 
       {/* Animated egg shapes in background */}
       <div
@@ -863,13 +1154,13 @@ export default function DetectionPage() {
                     <p className="text-gray-500 mb-6 text-sm">Press play to start detection</p>
                     <button
                       onClick={toggleCamera}
-                      className="bg-gradient-to-r from-[#0e5f97] to-[#083d66] hover:from-[#0e5f97]/90 hover:to-[#083d66]/90 text-white px-6 py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 mx-auto transform hover:scale-105 active:scale-95 w-full text-lg font-medium relative overflow-hidden group"
-                      disabled={readyState !== WebSocket.OPEN}
+                      className="bg-gradient-to-r from-[#0e5f97] to-[#083d66] hover:from-[#0e5f97]/90 hover:to-[#083d66]/90 text-white px-6 py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 mx-auto transform hover:scale-105 active:scale-95 w-full text-lg font-medium relative overflow-hidden group mb-2"
+                      disabled={readyState !== WebSocket.OPEN || isCameraLoading}
                     >
                       {/* Button shine effect */}
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
-                      <Play className="w-6 h-6" />
-                      <span className="relative z-10">Start Camera</span>
+                      {isCameraLoading ? <Loader className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6" />}
+                      <span className="relative z-10">{isCameraLoading ? "Starting..." : "Start Camera"}</span>
                     </button>
                   </div>
                 </div>
@@ -900,7 +1191,7 @@ export default function DetectionPage() {
               <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-center z-20">
                 <div className="flex items-center gap-3">
                   <Link
-                    href="/"
+                    href="/home"
                     className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg text-[#0e5f97] flex items-center justify-center transform hover:scale-105 active:scale-95 border border-white/50"
                   >
                     <ArrowLeft className="w-6 h-6" />
@@ -962,7 +1253,7 @@ export default function DetectionPage() {
                     className={`${
                       isCameraOn ? "bg-red-500/80 hover:bg-red-600/80" : "bg-[#0e5f97]/80 hover:bg-[#0c4d7a]/80"
                     } backdrop-blur-sm transition-all duration-300 p-4 rounded-2xl shadow-lg text-white flex items-center justify-center w-16 h-16 transform hover:scale-105 active:scale-95 relative overflow-hidden group border border-white/30`}
-                    disabled={readyState !== WebSocket.OPEN}
+                    disabled={readyState !== WebSocket.OPEN || isCameraLoading}
                   >
                     {/* Button shine effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 transform -translate-x-full group-hover:translate-x-full"></div>
@@ -982,14 +1273,14 @@ export default function DetectionPage() {
                       >
                         <FlipVertical className="w-7 h-7 group-hover:rotate-180 transition-transform duration-500" />
                       </button>
+
+                      {/* Manual detection button */}
                       <button
-                        onClick={triggerManualDetection}
+                        onClick={triggerDefectDetection}
                         className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group"
                         disabled={isProcessing}
                       >
-                        <RefreshCw
-                          className={`w-7 h-7 ${isProcessing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
-                        />
+                        <Camera className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" />
                       </button>
                     </>
                   )}
@@ -1004,12 +1295,6 @@ export default function DetectionPage() {
                         className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group"
                       >
                         <Maximize2 className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" />
-                      </button>
-                      <button className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group">
-                        <ZoomIn className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" />
-                      </button>
-                      <button className="bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all duration-300 p-3 rounded-xl shadow-lg border border-white/50 text-[#0e5f97] flex items-center justify-center w-14 h-14 transform hover:scale-105 active:scale-95 group">
-                        <Settings className="w-7 h-7 group-hover:rotate-90 transition-transform duration-500" />
                       </button>
                     </>
                   )}
@@ -1129,6 +1414,11 @@ export default function DetectionPage() {
           animation: slide-up 0.4s ease-out forwards;
         }
         
+        @keyframes scan {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
         .animate-scanline {
           animation: scanline 4s linear infinite;
         }
@@ -1163,6 +1453,16 @@ export default function DetectionPage() {
         .animate-tab-enter {
           animation: tab-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
+
+        @keyframes shine-slow {
+          0% { transform: translateX(-100%); opacity: 0; }
+          50% { opacity: 0.5; }
+          100% { transform: translateX(100%); opacity: 0; }
+        }
+
+        .animate-shine-slow {
+          animation: shine-slow 4s ease-in-out infinite;
+        }
       `}</style>
     </div>
   )
@@ -1190,16 +1490,4 @@ function StatusIndicator({ isActive, activeIcon, inactiveIcon }: StatusIndicator
       {isActive ? activeIcon : inactiveIcon}
     </div>
   )
-}
-
-// Types
-interface DetectionResult {
-  prediction: string | null
-  confidence: number | null
-}
-
-interface StatusIndicatorProps {
-  isActive: boolean
-  activeIcon: ReactNode
-  inactiveIcon: ReactNode
 }

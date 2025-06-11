@@ -3,8 +3,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.websocket.websocket_server import websocket_endpoint
+from app.core.model_loader import load_model
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+  load_model()
 
 app.add_middleware(
   CORSMiddleware,

@@ -1,3 +1,5 @@
+# D:\4THYEAR\CAPSTONE\MEGG\ai-inference-backend\app\core\model_loader.py
+
 import os
 import logging
 from dotenv import load_dotenv

@@ -4,14 +4,12 @@
   "private": true,
   "main": "./electron/main.js",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "export": "next build && next export",
+    "dev": "next dev",
     "electron": "electron .",
-    "electron-dev": "cross-env NODE_ENV=development electron .",
-    "start-electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\""
+    "start": "next start", 
+    "build": "next build",
+    "electron-dev": "electron .",
+    "start-electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron\""
   },
   "dependencies": {
     "firebase": "^11.6.0",

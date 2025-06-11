@@ -1,3 +1,5 @@
+
+# D:\4THYEAR\CAPSTONE\MEGG\ai-inference-backend\app\utils\image_processing.py
 import base64
 import logging
 import numpy as np
@@ -19,14 +21,23 @@ def preprocess_image(image_data):
     logger.error(f"Error preprocessing image: {e}")
     raise
 
+# Example of what might be happening in predict_defect
 def predict_defect(image_data):
     model = get_model()
     if model is None:
-        raise RuntimeError("Model is not loaded.")
+        raise Exception("model is not loaded")
     
-    img_array = preprocess_image(image_data)
-    prediction = model.predict(img_array)
-    class_index = np.argmax(prediction)
-    confidence = float(prediction[0][class_index])
-    predicted_class = CLASS_LABELS[class_index]
+    # Process image...
+    processed_image = preprocess_image(image_data)
+    
+    # Get prediction
+    predictions = model.predict(processed_image)
+    
+    # This might be causing the error if predictions is empty
+    predicted_class_index = np.argmax(predictions[0])  # Error if predictions is empty
+    class_labels = ["cracked", "dirty", "good"]
+    predicted_class = class_labels[predicted_class_index]  # Error if index is out of range
+    
+    confidence = float(predictions[0][predicted_class_index] * 100)  # Error if index is out of range
+    
     return predicted_class, confidence
