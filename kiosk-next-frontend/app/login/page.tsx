@@ -1,36 +1,13 @@
+//D:\4THYEAR\CAPSTONE\MEGG\kiosk-next-frontend\app\login\page.tsx
+
 "use client"
 
-import React from "react"
-import { useState, useEffect, useRef } from "react"
+import React, {useState, useEffect, useRef} from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Shield, Key, AlertCircle, Check, XCircle, Keyboard, ChevronRight, ArrowLeft, Loader, Lock } from "lucide-react"
-
-// ==========================================
-// Types
-// ==========================================
-type InputMode = "machineId" | "pin"
-type MachineIdPart = "year" | "series" | "unit"
-
-interface LoginState {
-  isLoaded: boolean
-  machineId: string
-  savedMachineId: string
-  showSavedModal: boolean
-  pin: string
-  loading: boolean
-  error: string
-  success: string
-  inputMode: InputMode
-  machineIdPart: MachineIdPart
-  yearInput: string
-  seriesInput: string
-  unitInput: string
-  isMachineIdFocused: boolean
-  showVerifyModal: boolean
-  showPinErrorModal: boolean
-}
+import type { InputMode, MachineIdPart, LoginState } from "./types"
 
 // ==========================================
 // Constants
