@@ -19,7 +19,7 @@ interface EggLoadingProps {
 }
 
 const EggLoading: React.FC<EggLoadingProps> = React.memo(
-  ({ isLoading, onComplete, progress, context }) => {
+  ({ isLoading, onComplete, progress }) => {
     const [pct, setPct] = useState(0)
 
     useEffect(() => {
@@ -99,5 +99,8 @@ const EggLoading: React.FC<EggLoadingProps> = React.memo(
     )
   }
 )
+
+EggLoading.displayName = "EggLoading";
+
 
 export default EggLoading

@@ -49,7 +49,7 @@ export default function WiFiManager({ isOpen, onClose }: WiFiManagerProps) {
     setScanning(true); setError("")
     try {
       const current = await wifiAPI.getCurrentNetwork()
-      let list = (await wifiAPI.scanNetworks()).map(n => ({
+      const list = (await wifiAPI.scanNetworks()).map(n => ({
         ...n,
         connected: current?.ssid.trim().toLowerCase() === n.ssid.trim().toLowerCase()
       }))

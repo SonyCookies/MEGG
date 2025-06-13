@@ -80,7 +80,7 @@ async function connectMacOS(ssid: string, password?: string): Promise<boolean> {
       ? `networksetup -setairportnetwork en0 "${ssid}" "${password}"`
       : `networksetup -setairportnetwork en0 "${ssid}"`
 
-    const { stdout, stderr } = await execAsync(command)
+    const { stderr } = await execAsync(command)
 
     if (stderr) {
       throw new Error(stderr)

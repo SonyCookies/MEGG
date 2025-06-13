@@ -4,7 +4,7 @@
 import React, { useEffect, useState, MouseEvent } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Settings, LogIn, Plug, Globe, AlertCircle } from "lucide-react"
+import { Settings, LogIn, Plug, Globe } from "lucide-react"
 
 import EggLoading from "./components/egg-loading"
 import { useInternetConnection, useWebSocket } from "./contexts/NetworkContext"
@@ -20,7 +20,7 @@ interface LoadingContext {
 export default function Home() {
   const router = useRouter()
   const [isLoaded, setIsLoaded] = useState(false)
-  const [hoverButton, setHoverButton] = useState<string | null>(null)
+  const [ , setHoverButton] = useState<string | null>(null)
 
   // Page-level loader state
   const [isLoading, setIsLoading] = useState(false)

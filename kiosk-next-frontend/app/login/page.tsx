@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Shield, Key, AlertCircle, Check, XCircle, Keyboard, ChevronRight, ArrowLeft, Loader, Lock } from "lucide-react"
-import type { InputMode, MachineIdPart, LoginState } from "./types"
+import type { MachineIdPart, LoginState } from "./types"
 
 // ==========================================
 // Constants

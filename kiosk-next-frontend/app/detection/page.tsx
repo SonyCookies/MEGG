@@ -154,6 +154,72 @@ export default function DetectionPage() {
     return () => clearTimeout(timer)
   }, [isLoaded, showBatchInfo])
 
+    // New function to trigger defect detection
+  const triggerDefectDetection = async () => {
+    if (!isCameraOn || isProcessing || defectDetection.isProcessing) return
+
+    // Start processing animation
+    setIsProcessing(true)
+    setProcessingProgress(0)
+
+    const progressInterval = setInterval(() => {
+      setProcessingProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval)
+          return 100
+        }
+        return prev + 5
+      })
+    }, 50)
+
+    try {
+      console.log("📸 Starting defect detection process")
+
+      // Capture image from video element
+      if (isElectronMode) {
+        // In Electron mode, use the camera context to capture a frame
+        console.log("📸 Capturing frame using Electron API")
+        const imageData = await camera.captureFrame()
+
+        if (imageData) {
+          // Send the image to the defect detection service
+          const result = await defectDetection.detectDefect(imageData)
+
+          if (result) {
+            setDetectionResult(result)
+          }
+        } else {
+          throw new Error("Failed to capture frame from Electron camera")
+        }
+      } else {
+        // In browser mode, capture image from video element
+        if (!videoRef.current) {
+          throw new Error("Video element not available")
+        }
+
+        console.log("📸 Capturing image from video element")
+        const imageData = await captureImageFromVideo(videoRef.current)
+        console.log("📸 Image captured successfully")
+
+        // Send the image to the defect detection service
+        const result = await defectDetection.detectDefect(imageData)
+
+        if (result) {
+          setDetectionResult(result)
+        }
+      }
+
+      clearInterval(progressInterval)
+      setProcessingProgress(100)
+    } catch (err) {
+      console.error("❌ Error during defect detection:", err)
+      setErrorMessage(`Defect detection error: ${err instanceof Error ? err.message : String(err)}`)
+      clearInterval(progressInterval)
+      setProcessingProgress(0)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
   // Perform defect detection at regular intervals when camera is on
   useEffect(() => {
     if (isCameraOn && !isProcessing && !defectDetection.isProcessing) {
@@ -163,7 +229,7 @@ export default function DetectionPage() {
 
       return () => clearInterval(detectionInterval)
     }
-  }, [isCameraOn, isProcessing, defectDetection.isProcessing])
+  }, [isCameraOn, isProcessing, defectDetection.isProcessing, triggerDefectDetection])
 
   // Update local state when defect detection state changes
   useEffect(() => {
@@ -473,72 +539,6 @@ export default function DetectionPage() {
     setShowBatchInfo(!showBatchInfo)
   }
 
-  // New function to trigger defect detection
-  const triggerDefectDetection = async () => {
-    if (!isCameraOn || isProcessing || defectDetection.isProcessing) return
-
-    // Start processing animation
-    setIsProcessing(true)
-    setProcessingProgress(0)
-
-    const progressInterval = setInterval(() => {
-      setProcessingProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval)
-          return 100
-        }
-        return prev + 5
-      })
-    }, 50)
-
-    try {
-      console.log("📸 Starting defect detection process")
-
-      // Capture image from video element
-      if (isElectronMode) {
-        // In Electron mode, use the camera context to capture a frame
-        console.log("📸 Capturing frame using Electron API")
-        const imageData = await camera.captureFrame()
-
-        if (imageData) {
-          // Send the image to the defect detection service
-          const result = await defectDetection.detectDefect(imageData)
-
-          if (result) {
-            setDetectionResult(result)
-          }
-        } else {
-          throw new Error("Failed to capture frame from Electron camera")
-        }
-      } else {
-        // In browser mode, capture image from video element
-        if (!videoRef.current) {
-          throw new Error("Video element not available")
-        }
-
-        console.log("📸 Capturing image from video element")
-        const imageData = await captureImageFromVideo(videoRef.current)
-        console.log("📸 Image captured successfully")
-
-        // Send the image to the defect detection service
-        const result = await defectDetection.detectDefect(imageData)
-
-        if (result) {
-          setDetectionResult(result)
-        }
-      }
-
-      clearInterval(progressInterval)
-      setProcessingProgress(100)
-    } catch (err) {
-      console.error("❌ Error during defect detection:", err)
-      setErrorMessage(`Defect detection error: ${err instanceof Error ? err.message : String(err)}`)
-      clearInterval(progressInterval)
-      setProcessingProgress(0)
-    } finally {
-      setIsProcessing(false)
-    }
-  }
 
   // Helper function to get color class based on prediction type
   const getTextColorClass = (type: string | null) => {

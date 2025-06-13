@@ -7,7 +7,7 @@ const execAsync = promisify(exec)
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("=== Getting current WiFi network ===")
+    console.log("=== Getting current WiFi network ===" + request)
     const platform = os.platform()
     console.log("Platform:", platform)
     let network = null

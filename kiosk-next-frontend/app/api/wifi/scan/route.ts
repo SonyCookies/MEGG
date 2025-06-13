@@ -16,7 +16,7 @@ interface WiFiNetwork {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Starting WiFi scan...")
+    console.log("Starting WiFi scan..." + request)
     const platform = os.platform()
     let networks: WiFiNetwork[] = []
 
@@ -111,7 +111,7 @@ async function scanMacOS(): Promise<WiFiNetwork[]> {
         const match = line.match(/^(.+?)\s+([a-fA-F0-9:]{17})\s+(-?\d+)\s+(\d+)\s+(.+)$/)
         if (!match) return null
 
-        const [, ssid, bssid, rssi, channel, security] = match
+        const [, ssid, bssid, rssi, security] = match
         const trimmedSSID = ssid.trim()
 
         if (!trimmedSSID) return null
@@ -284,7 +284,7 @@ async function tryWindowsProfileScanImproved(currentSSID: string | null): Promis
             }
           }
         } catch (profileError) {
-          console.log(`Failed to get details for profile "${profileName}"`)
+          console.log(`Failed to get details for profile "${profileName}" Error : ` + profileError)
         }
       }
     }

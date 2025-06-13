@@ -69,6 +69,7 @@ async function disconnectLinux(ssid: string): Promise<boolean> {
 async function disconnectMacOS(ssid: string): Promise<boolean> {
   try {
     // Turn off WiFi and turn it back on
+    console.log(ssid)
     await execAsync("networksetup -setairportpower en0 off")
     await new Promise((resolve) => setTimeout(resolve, 2000))
     await execAsync("networksetup -setairportpower en0 on")
@@ -83,6 +84,7 @@ async function disconnectMacOS(ssid: string): Promise<boolean> {
 async function disconnectWindows(ssid: string): Promise<boolean> {
   try {
     // Disconnect from the specific network
+    console.log(ssid)
     await execAsync(`netsh wlan disconnect`)
 
     return true

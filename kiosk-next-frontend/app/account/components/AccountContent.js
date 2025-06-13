@@ -546,12 +546,6 @@ export default function AccountContent() {
     return <SkeletonCard />;
   }
 
-  const {
-    icon: IconComp,
-    label: currentLabel,
-    component: CardComp,
-  } = cards[currentCard];
-
   return (
     <div className="h-full flex flex-col max-h-[380px]">
       {/* Carousel content */}
